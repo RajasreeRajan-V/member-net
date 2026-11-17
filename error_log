@@ -1,0 +1,219 @@
+[03-Jun-2026 15:26:40 Asia/Kolkata] PHP Fatal error:  Uncaught TypeError: Illuminate\Foundation\Configuration\Middleware::appendToGroup(): Argument #2 ($middleware) must be of type array|string, Closure given, called in /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/bootstrap/app.php on line 21 and defined in /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/vendor/laravel/framework/src/Illuminate/Foundation/Configuration/Middleware.php:276
+Stack trace:
+#0 /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/bootstrap/app.php(21): Illuminate\Foundation\Configuration\Middleware->appendToGroup('api', Object(Closure))
+#1 /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/vendor/laravel/framework/src/Illuminate/Foundation/Configuration/ApplicationBuilder.php(308): {closure}(Object(Illuminate\Foundation\Configuration\Middleware))
+#2 /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/vendor/laravel/framework/src/Illuminate/Container/Container.php(1618): Illuminate\Foundation\Configuration\ApplicationBuilder->Illuminate\Foundation\Configuration\{closure}(Object(Illuminate\Foundation\Console\Kernel), Object(Illuminate\Foundation\Application))
+#3 /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/vendor/laravel/framework/src/Illuminate/Container/Container.php(1556): Illuminate\Container\Container->fireCallbackArray(Object(Illuminate\Foundation\Console\Kernel), Array)
+#4 /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/vendor/laravel/framework/src/Illuminate/Container/Container.php(1542): Illuminate\Container\Container->fireAfterResolvingCallbacks('Illuminate\\Cont...', Object(Illuminate\Foundation\Console\Kernel))
+#5 /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/vendor/laravel/framework/src/Illuminate/Container/Container.php(951): Illuminate\Container\Container->fireResolvingCallbacks('Illuminate\\Cont...', Object(Illuminate\Foundation\Console\Kernel))
+#6 /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1078): Illuminate\Container\Container->resolve('Illuminate\\Cont...', Array, true)
+#7 /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/vendor/laravel/framework/src/Illuminate/Container/Container.php(864): Illuminate\Foundation\Application->resolve('Illuminate\\Cont...', Array)
+#8 /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1058): Illuminate\Container\Container->make('Illuminate\\Cont...', Array)
+#9 /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1233): Illuminate\Foundation\Application->make('Illuminate\\Cont...')
+#10 /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/artisan(16): Illuminate\Foundation\Application->handleCommand(Object(Symfony\Component\Console\Input\ArgvInput))
+#11 {main}
+  thrown in /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/vendor/laravel/framework/src/Illuminate/Foundation/Configuration/Middleware.php on line 276
+[03-Jun-2026 15:26:40 Asia/Kolkata] PHP Fatal error:  Uncaught TypeError: Illuminate\Foundation\Configuration\Middleware::appendToGroup(): Argument #2 ($middleware) must be of type array|string, Closure given, called in /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/bootstrap/app.php on line 21 and defined in /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/vendor/laravel/framework/src/Illuminate/Foundation/Configuration/Middleware.php:276
+Stack trace:
+#0 /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/bootstrap/app.php(21): Illuminate\Foundation\Configuration\Middleware->appendToGroup('api', Object(Closure))
+#1 /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/vendor/laravel/framework/src/Illuminate/Foundation/Configuration/ApplicationBuilder.php(308): {closure}(Object(Illuminate\Foundation\Configuration\Middleware))
+#2 /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/vendor/laravel/framework/src/Illuminate/Container/Container.php(1618): Illuminate\Foundation\Configuration\ApplicationBuilder->Illuminate\Foundation\Configuration\{closure}(Object(Illuminate\Foundation\Console\Kernel), Object(Illuminate\Foundation\Application))
+#3 /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/vendor/laravel/framework/src/Illuminate/Container/Container.php(1556): Illuminate\Container\Container->fireCallbackArray(Object(Illuminate\Foundation\Console\Kernel), Array)
+#4 /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/vendor/laravel/framework/src/Illuminate/Container/Container.php(1542): Illuminate\Container\Container->fireAfterResolvingCallbacks('Illuminate\\Cont...', Object(Illuminate\Foundation\Console\Kernel))
+#5 /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/vendor/laravel/framework/src/Illuminate/Container/Container.php(951): Illuminate\Container\Container->fireResolvingCallbacks('Illuminate\\Cont...', Object(Illuminate\Foundation\Console\Kernel))
+#6 /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1078): Illuminate\Container\Container->resolve('Illuminate\\Cont...', Array, true)
+#7 /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/vendor/laravel/framework/src/Illuminate/Container/Container.php(864): Illuminate\Foundation\Application->resolve('Illuminate\\Cont...', Array)
+#8 /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1058): Illuminate\Container\Container->make('Illuminate\\Cont...', Array)
+#9 /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1233): Illuminate\Foundation\Application->make('Illuminate\\Cont...')
+#10 /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/artisan(16): Illuminate\Foundation\Application->handleCommand(Object(Symfony\Component\Console\Input\ArgvInput))
+#11 {main}
+  thrown in /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/vendor/laravel/framework/src/Illuminate/Foundation/Configuration/Middleware.php on line 276
+[03-Jun-2026 15:26:40 Asia/Kolkata] PHP Fatal error:  Uncaught TypeError: Illuminate\Foundation\Configuration\Middleware::appendToGroup(): Argument #2 ($middleware) must be of type array|string, Closure given, called in /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/bootstrap/app.php on line 21 and defined in /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/vendor/laravel/framework/src/Illuminate/Foundation/Configuration/Middleware.php:276
+Stack trace:
+#0 /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/bootstrap/app.php(21): Illuminate\Foundation\Configuration\Middleware->appendToGroup('api', Object(Closure))
+#1 /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/vendor/laravel/framework/src/Illuminate/Foundation/Configuration/ApplicationBuilder.php(308): {closure}(Object(Illuminate\Foundation\Configuration\Middleware))
+#2 /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/vendor/laravel/framework/src/Illuminate/Container/Container.php(1618): Illuminate\Foundation\Configuration\ApplicationBuilder->Illuminate\Foundation\Configuration\{closure}(Object(Illuminate\Foundation\Console\Kernel), Object(Illuminate\Foundation\Application))
+#3 /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/vendor/laravel/framework/src/Illuminate/Container/Container.php(1556): Illuminate\Container\Container->fireCallbackArray(Object(Illuminate\Foundation\Console\Kernel), Array)
+#4 /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/vendor/laravel/framework/src/Illuminate/Container/Container.php(1542): Illuminate\Container\Container->fireAfterResolvingCallbacks('Illuminate\\Cont...', Object(Illuminate\Foundation\Console\Kernel))
+#5 /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/vendor/laravel/framework/src/Illuminate/Container/Container.php(951): Illuminate\Container\Container->fireResolvingCallbacks('Illuminate\\Cont...', Object(Illuminate\Foundation\Console\Kernel))
+#6 /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1078): Illuminate\Container\Container->resolve('Illuminate\\Cont...', Array, true)
+#7 /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/vendor/laravel/framework/src/Illuminate/Container/Container.php(864): Illuminate\Foundation\Application->resolve('Illuminate\\Cont...', Array)
+#8 /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1058): Illuminate\Container\Container->make('Illuminate\\Cont...', Array)
+#9 /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1233): Illuminate\Foundation\Application->make('Illuminate\\Cont...')
+#10 /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/artisan(16): Illuminate\Foundation\Application->handleCommand(Object(Symfony\Component\Console\Input\ArgvInput))
+#11 {main}
+  thrown in /home/astradevelops/public_html/kmubhashira.astradevelops.in/eca-api/vendor/laravel/framework/src/Illuminate/Foundation/Configuration/Middleware.php on line 276
+[16-Oct-2026 16:32:39 Asia/Kolkata] PHP Fatal error:  Uncaught Error: Call to undefined function Symfony\Component\Process\proc_get_status() in phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php:1346
+Stack trace:
+#0 phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php(368): Symfony\Component\Process\Process->updateStatus()
+#1 phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php(253): Symfony\Component\Process\Process->start()
+#2 phar:///home1/astradevelops/bin/composer/src/Composer/Util/ProcessExecutor.php(168): Symfony\Component\Process\Process->run()
+#3 phar:///home1/astradevelops/bin/composer/src/Composer/Util/ProcessExecutor.php(213): Composer\Util\ProcessExecutor->runProcess()
+#4 phar:///home1/astradevelops/bin/composer/src/Composer/Util/ProcessExecutor.php(96): Composer\Util\ProcessExecutor->doExecute()
+#5 phar:///home1/astradevelops/bin/composer/src/Composer/Package/Version/VersionGuesser.php(146): Composer\Util\ProcessExecutor->execute()
+#6 phar:///home1/astradevelops/bin/composer/src/Composer/Package/Version/VersionGuesser.php(85): Composer\Package\Version\VersionGuesser->guessGitVersion()
+#7 phar:///home1/astradevelops/bin/composer/src/Composer/Package/Loader/RootPackageLoader.php(98): Composer\Package\Version\VersionGuesser->guessVersion()
+#8 phar:///home1/astradevelops/bin/composer/src/Composer/Factory.php(394): Composer\Package\Loader\RootPackageLoader->load()
+#9 phar:///home1/astradevelops/bin/composer/src/Composer/Factory.php(634): Composer\Factory->createComposer()
+#10 phar:///home1/astradevelops/bin/composer/src/Composer/Console/Application.php(559): Composer\Factory::create()
+#11 phar:///home1/astradevelops/bin/composer/src/Composer/Console/Application.php(482): Composer\Console\Application->getComposer()
+#12 phar:///home1/astradevelops/bin/composer/src/Composer/Console/Application.php(428): Composer\Console\Application->hintCommonErrors()
+#13 phar:///home1/astradevelops/bin/composer/vendor/symfony/console/Application.php(171): Composer\Console\Application->doRun()
+#14 phar:///home1/astradevelops/bin/composer/src/Composer/Console/Application.php(137): Symfony\Component\Console\Application->run()
+#15 phar:///home1/astradevelops/bin/composer/bin/composer(98): Composer\Console\Application->run()
+#16 /home1/astradevelops/bin/composer(29): require('phar:///home1/a...')
+#17 {main}
+  thrown in phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php on line 1346
+[16-Oct-2026 16:32:39 Asia/Kolkata] PHP Fatal error:  Uncaught Error: Call to undefined function Symfony\Component\Process\proc_get_status() in phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php:1346
+Stack trace:
+#0 phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php(869): Symfony\Component\Process\Process->updateStatus()
+#1 phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php(921): Symfony\Component\Process\Process->isRunning()
+#2 phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php(219): Symfony\Component\Process\Process->stop()
+#3 [internal function]: Symfony\Component\Process\Process->__destruct()
+#4 {main}
+  thrown in phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php on line 1346
+[19-Oct-2026 14:13:46 Asia/Kolkata] PHP Fatal error:  Uncaught Error: Call to undefined function Symfony\Component\Process\proc_get_status() in phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php:1346
+Stack trace:
+#0 phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php(368): Symfony\Component\Process\Process->updateStatus()
+#1 phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php(253): Symfony\Component\Process\Process->start()
+#2 phar:///home1/astradevelops/bin/composer/src/Composer/Util/ProcessExecutor.php(168): Symfony\Component\Process\Process->run()
+#3 phar:///home1/astradevelops/bin/composer/src/Composer/Util/ProcessExecutor.php(213): Composer\Util\ProcessExecutor->runProcess()
+#4 phar:///home1/astradevelops/bin/composer/src/Composer/Util/ProcessExecutor.php(96): Composer\Util\ProcessExecutor->doExecute()
+#5 phar:///home1/astradevelops/bin/composer/src/Composer/Package/Version/VersionGuesser.php(146): Composer\Util\ProcessExecutor->execute()
+#6 phar:///home1/astradevelops/bin/composer/src/Composer/Package/Version/VersionGuesser.php(85): Composer\Package\Version\VersionGuesser->guessGitVersion()
+#7 phar:///home1/astradevelops/bin/composer/src/Composer/Package/Loader/RootPackageLoader.php(98): Composer\Package\Version\VersionGuesser->guessVersion()
+#8 phar:///home1/astradevelops/bin/composer/src/Composer/Factory.php(394): Composer\Package\Loader\RootPackageLoader->load()
+#9 phar:///home1/astradevelops/bin/composer/src/Composer/Factory.php(634): Composer\Factory->createComposer()
+#10 phar:///home1/astradevelops/bin/composer/src/Composer/Console/Application.php(559): Composer\Factory::create()
+#11 phar:///home1/astradevelops/bin/composer/src/Composer/Console/Application.php(482): Composer\Console\Application->getComposer()
+#12 phar:///home1/astradevelops/bin/composer/src/Composer/Console/Application.php(428): Composer\Console\Application->hintCommonErrors()
+#13 phar:///home1/astradevelops/bin/composer/vendor/symfony/console/Application.php(171): Composer\Console\Application->doRun()
+#14 phar:///home1/astradevelops/bin/composer/src/Composer/Console/Application.php(137): Symfony\Component\Console\Application->run()
+#15 phar:///home1/astradevelops/bin/composer/bin/composer(98): Composer\Console\Application->run()
+#16 /home1/astradevelops/bin/composer(29): require('phar:///home1/a...')
+#17 {main}
+  thrown in phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php on line 1346
+[19-Oct-2026 14:13:46 Asia/Kolkata] PHP Fatal error:  Uncaught Error: Call to undefined function Symfony\Component\Process\proc_get_status() in phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php:1346
+Stack trace:
+#0 phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php(869): Symfony\Component\Process\Process->updateStatus()
+#1 phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php(921): Symfony\Component\Process\Process->isRunning()
+#2 phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php(219): Symfony\Component\Process\Process->stop()
+#3 [internal function]: Symfony\Component\Process\Process->__destruct()
+#4 {main}
+  thrown in phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php on line 1346
+[22-Oct-2026 09:22:19 Asia/Kolkata] PHP Fatal error:  Uncaught Error: Call to undefined function Symfony\Component\Process\proc_get_status() in phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php:1346
+Stack trace:
+#0 phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php(368): Symfony\Component\Process\Process->updateStatus()
+#1 phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php(253): Symfony\Component\Process\Process->start()
+#2 phar:///home1/astradevelops/bin/composer/src/Composer/Util/ProcessExecutor.php(168): Symfony\Component\Process\Process->run()
+#3 phar:///home1/astradevelops/bin/composer/src/Composer/Util/ProcessExecutor.php(213): Composer\Util\ProcessExecutor->runProcess()
+#4 phar:///home1/astradevelops/bin/composer/src/Composer/Util/ProcessExecutor.php(96): Composer\Util\ProcessExecutor->doExecute()
+#5 phar:///home1/astradevelops/bin/composer/src/Composer/Package/Version/VersionGuesser.php(146): Composer\Util\ProcessExecutor->execute()
+#6 phar:///home1/astradevelops/bin/composer/src/Composer/Package/Version/VersionGuesser.php(85): Composer\Package\Version\VersionGuesser->guessGitVersion()
+#7 phar:///home1/astradevelops/bin/composer/src/Composer/Package/Loader/RootPackageLoader.php(98): Composer\Package\Version\VersionGuesser->guessVersion()
+#8 phar:///home1/astradevelops/bin/composer/src/Composer/Factory.php(394): Composer\Package\Loader\RootPackageLoader->load()
+#9 phar:///home1/astradevelops/bin/composer/src/Composer/Factory.php(634): Composer\Factory->createComposer()
+#10 phar:///home1/astradevelops/bin/composer/src/Composer/Console/Application.php(559): Composer\Factory::create()
+#11 phar:///home1/astradevelops/bin/composer/src/Composer/Console/Application.php(482): Composer\Console\Application->getComposer()
+#12 phar:///home1/astradevelops/bin/composer/src/Composer/Console/Application.php(428): Composer\Console\Application->hintCommonErrors()
+#13 phar:///home1/astradevelops/bin/composer/vendor/symfony/console/Application.php(171): Composer\Console\Application->doRun()
+#14 phar:///home1/astradevelops/bin/composer/src/Composer/Console/Application.php(137): Symfony\Component\Console\Application->run()
+#15 phar:///home1/astradevelops/bin/composer/bin/composer(98): Composer\Console\Application->run()
+#16 /home1/astradevelops/bin/composer(29): require('phar:///home1/a...')
+#17 {main}
+  thrown in phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php on line 1346
+[22-Oct-2026 09:22:19 Asia/Kolkata] PHP Fatal error:  Uncaught Error: Call to undefined function Symfony\Component\Process\proc_get_status() in phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php:1346
+Stack trace:
+#0 phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php(869): Symfony\Component\Process\Process->updateStatus()
+#1 phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php(921): Symfony\Component\Process\Process->isRunning()
+#2 phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php(219): Symfony\Component\Process\Process->stop()
+#3 [internal function]: Symfony\Component\Process\Process->__destruct()
+#4 {main}
+  thrown in phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php on line 1346
+[22-Oct-2026 09:42:35 Asia/Kolkata] PHP Fatal error:  Uncaught Error: Call to undefined function Symfony\Component\Process\proc_get_status() in phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php:1346
+Stack trace:
+#0 phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php(368): Symfony\Component\Process\Process->updateStatus()
+#1 phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php(253): Symfony\Component\Process\Process->start()
+#2 phar:///home1/astradevelops/bin/composer/src/Composer/Util/ProcessExecutor.php(168): Symfony\Component\Process\Process->run()
+#3 phar:///home1/astradevelops/bin/composer/src/Composer/Util/ProcessExecutor.php(213): Composer\Util\ProcessExecutor->runProcess()
+#4 phar:///home1/astradevelops/bin/composer/src/Composer/Util/ProcessExecutor.php(96): Composer\Util\ProcessExecutor->doExecute()
+#5 phar:///home1/astradevelops/bin/composer/src/Composer/Package/Version/VersionGuesser.php(146): Composer\Util\ProcessExecutor->execute()
+#6 phar:///home1/astradevelops/bin/composer/src/Composer/Package/Version/VersionGuesser.php(85): Composer\Package\Version\VersionGuesser->guessGitVersion()
+#7 phar:///home1/astradevelops/bin/composer/src/Composer/Package/Loader/RootPackageLoader.php(98): Composer\Package\Version\VersionGuesser->guessVersion()
+#8 phar:///home1/astradevelops/bin/composer/src/Composer/Factory.php(394): Composer\Package\Loader\RootPackageLoader->load()
+#9 phar:///home1/astradevelops/bin/composer/src/Composer/Factory.php(634): Composer\Factory->createComposer()
+#10 phar:///home1/astradevelops/bin/composer/src/Composer/Console/Application.php(559): Composer\Factory::create()
+#11 phar:///home1/astradevelops/bin/composer/src/Composer/Console/Application.php(482): Composer\Console\Application->getComposer()
+#12 phar:///home1/astradevelops/bin/composer/src/Composer/Console/Application.php(428): Composer\Console\Application->hintCommonErrors()
+#13 phar:///home1/astradevelops/bin/composer/vendor/symfony/console/Application.php(171): Composer\Console\Application->doRun()
+#14 phar:///home1/astradevelops/bin/composer/src/Composer/Console/Application.php(137): Symfony\Component\Console\Application->run()
+#15 phar:///home1/astradevelops/bin/composer/bin/composer(98): Composer\Console\Application->run()
+#16 /home1/astradevelops/bin/composer(29): require('phar:///home1/a...')
+#17 {main}
+  thrown in phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php on line 1346
+[22-Oct-2026 09:42:35 Asia/Kolkata] PHP Fatal error:  Uncaught Error: Call to undefined function Symfony\Component\Process\proc_get_status() in phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php:1346
+Stack trace:
+#0 phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php(869): Symfony\Component\Process\Process->updateStatus()
+#1 phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php(921): Symfony\Component\Process\Process->isRunning()
+#2 phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php(219): Symfony\Component\Process\Process->stop()
+#3 [internal function]: Symfony\Component\Process\Process->__destruct()
+#4 {main}
+  thrown in phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php on line 1346
+[22-Oct-2026 10:48:20 Asia/Kolkata] PHP Fatal error:  Uncaught Error: Call to undefined function Symfony\Component\Process\proc_get_status() in phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php:1346
+Stack trace:
+#0 phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php(368): Symfony\Component\Process\Process->updateStatus()
+#1 phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php(253): Symfony\Component\Process\Process->start()
+#2 phar:///home1/astradevelops/bin/composer/src/Composer/Util/ProcessExecutor.php(168): Symfony\Component\Process\Process->run()
+#3 phar:///home1/astradevelops/bin/composer/src/Composer/Util/ProcessExecutor.php(213): Composer\Util\ProcessExecutor->runProcess()
+#4 phar:///home1/astradevelops/bin/composer/src/Composer/Util/ProcessExecutor.php(96): Composer\Util\ProcessExecutor->doExecute()
+#5 phar:///home1/astradevelops/bin/composer/src/Composer/Package/Version/VersionGuesser.php(146): Composer\Util\ProcessExecutor->execute()
+#6 phar:///home1/astradevelops/bin/composer/src/Composer/Package/Version/VersionGuesser.php(85): Composer\Package\Version\VersionGuesser->guessGitVersion()
+#7 phar:///home1/astradevelops/bin/composer/src/Composer/Package/Loader/RootPackageLoader.php(98): Composer\Package\Version\VersionGuesser->guessVersion()
+#8 phar:///home1/astradevelops/bin/composer/src/Composer/Factory.php(394): Composer\Package\Loader\RootPackageLoader->load()
+#9 phar:///home1/astradevelops/bin/composer/src/Composer/Factory.php(634): Composer\Factory->createComposer()
+#10 phar:///home1/astradevelops/bin/composer/src/Composer/Console/Application.php(559): Composer\Factory::create()
+#11 phar:///home1/astradevelops/bin/composer/src/Composer/Console/Application.php(482): Composer\Console\Application->getComposer()
+#12 phar:///home1/astradevelops/bin/composer/src/Composer/Console/Application.php(428): Composer\Console\Application->hintCommonErrors()
+#13 phar:///home1/astradevelops/bin/composer/vendor/symfony/console/Application.php(171): Composer\Console\Application->doRun()
+#14 phar:///home1/astradevelops/bin/composer/src/Composer/Console/Application.php(137): Symfony\Component\Console\Application->run()
+#15 phar:///home1/astradevelops/bin/composer/bin/composer(98): Composer\Console\Application->run()
+#16 /home1/astradevelops/bin/composer(29): require('phar:///home1/a...')
+#17 {main}
+  thrown in phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php on line 1346
+[22-Oct-2026 10:48:20 Asia/Kolkata] PHP Fatal error:  Uncaught Error: Call to undefined function Symfony\Component\Process\proc_get_status() in phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php:1346
+Stack trace:
+#0 phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php(869): Symfony\Component\Process\Process->updateStatus()
+#1 phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php(921): Symfony\Component\Process\Process->isRunning()
+#2 phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php(219): Symfony\Component\Process\Process->stop()
+#3 [internal function]: Symfony\Component\Process\Process->__destruct()
+#4 {main}
+  thrown in phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php on line 1346
+[22-Oct-2026 11:20:53 Asia/Kolkata] PHP Fatal error:  Uncaught Error: Call to undefined function Symfony\Component\Process\proc_get_status() in phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php:1346
+Stack trace:
+#0 phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php(368): Symfony\Component\Process\Process->updateStatus()
+#1 phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php(253): Symfony\Component\Process\Process->start()
+#2 phar:///home1/astradevelops/bin/composer/src/Composer/Util/ProcessExecutor.php(168): Symfony\Component\Process\Process->run()
+#3 phar:///home1/astradevelops/bin/composer/src/Composer/Util/ProcessExecutor.php(213): Composer\Util\ProcessExecutor->runProcess()
+#4 phar:///home1/astradevelops/bin/composer/src/Composer/Util/ProcessExecutor.php(96): Composer\Util\ProcessExecutor->doExecute()
+#5 phar:///home1/astradevelops/bin/composer/src/Composer/Package/Version/VersionGuesser.php(146): Composer\Util\ProcessExecutor->execute()
+#6 phar:///home1/astradevelops/bin/composer/src/Composer/Package/Version/VersionGuesser.php(85): Composer\Package\Version\VersionGuesser->guessGitVersion()
+#7 phar:///home1/astradevelops/bin/composer/src/Composer/Package/Loader/RootPackageLoader.php(98): Composer\Package\Version\VersionGuesser->guessVersion()
+#8 phar:///home1/astradevelops/bin/composer/src/Composer/Factory.php(394): Composer\Package\Loader\RootPackageLoader->load()
+#9 phar:///home1/astradevelops/bin/composer/src/Composer/Factory.php(634): Composer\Factory->createComposer()
+#10 phar:///home1/astradevelops/bin/composer/src/Composer/Console/Application.php(559): Composer\Factory::create()
+#11 phar:///home1/astradevelops/bin/composer/src/Composer/Console/Application.php(482): Composer\Console\Application->getComposer()
+#12 phar:///home1/astradevelops/bin/composer/src/Composer/Console/Application.php(428): Composer\Console\Application->hintCommonErrors()
+#13 phar:///home1/astradevelops/bin/composer/vendor/symfony/console/Application.php(171): Composer\Console\Application->doRun()
+#14 phar:///home1/astradevelops/bin/composer/src/Composer/Console/Application.php(137): Symfony\Component\Console\Application->run()
+#15 phar:///home1/astradevelops/bin/composer/bin/composer(98): Composer\Console\Application->run()
+#16 /home1/astradevelops/bin/composer(29): require('phar:///home1/a...')
+#17 {main}
+  thrown in phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php on line 1346
+[22-Oct-2026 11:20:53 Asia/Kolkata] PHP Fatal error:  Uncaught Error: Call to undefined function Symfony\Component\Process\proc_get_status() in phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php:1346
+Stack trace:
+#0 phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php(869): Symfony\Component\Process\Process->updateStatus()
+#1 phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php(921): Symfony\Component\Process\Process->isRunning()
+#2 phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php(219): Symfony\Component\Process\Process->stop()
+#3 [internal function]: Symfony\Component\Process\Process->__destruct()
+#4 {main}
+  thrown in phar:///home1/astradevelops/bin/composer/vendor/symfony/process/Process.php on line 1346

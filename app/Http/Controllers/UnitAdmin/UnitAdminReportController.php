@@ -1,0 +1,212 @@
+<?php
+
+namespace App\Http\Controllers\UnitAdmin;
+
+use App\Http\Controllers\Controller;
+use App\Models\MemberProfile;
+use App\Models\State;
+use App\Models\Payment;
+use App\Models\UnitAdmin;
+use App\Models\Unit;
+use App\Models\FundraisingCampaign;
+use App\Models\Committee;
+use App\Models\OtherFee;
+use App\Models\Scheme;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+
+class UnitAdminReportController extends Controller
+{
+    private function myUnitId(): int
+    {
+        return UnitAdmin::where('user_id', Auth::id())->value('unit_id');
+    }
+
+    private function unitUserIds(int $unitId)
+    {
+        return MemberProfile::where('unit_id', $unitId)->pluck('user_id');
+    }
+
+    public function index()
+    {
+        $unitId = $this->myUnitId();
+        $unit   = Unit::with('district.state')->find($unitId);
+        $userId = Auth::id();
+
+        $unitUserIds = $this->unitUserIds($unitId);
+
+        $totalAmountCollected = Payment::whereIn('user_id', $unitUserIds)
+            ->where('status', 'SUCCESS')->sum('amount');
+        $memberRevenue  = Payment::whereIn('user_id', $unitUserIds)->where('status','SUCCESS')->where('payment_type','MEMBERSHIP')->sum('amount');
+        $eventRevenue   = Payment::whereIn('user_id', $unitUserIds)->where('status','SUCCESS')->where('payment_type','EVENT')->sum('amount');
+        $renewalRevenue = Payment::whereIn('user_id', $unitUserIds)->where('status','SUCCESS')->where('payment_type','RENEWAL')->sum('amount');
+
+        return view('unit-admin.reports', [
+            'unit' => $unit,
+
+            // ── member counts ──
+            'totalMembers'    => MemberProfile::where('unit_id', $unitId)->count(),
+            'activeMembers'   => MemberProfile::where('unit_id', $unitId)->where('status', 'ACTIVE')->count(),
+            'approvedMembers' => MemberProfile::where('unit_id', $unitId)->where('status', 'APPROVED')->count(),
+            'pendingMembers'  => MemberProfile::where('unit_id', $unitId)->where('status', 'PENDING')->count(),
+            'rejectedMembers' => MemberProfile::where('unit_id', $unitId)->where('status', 'REJECTED')->count(),
+
+            // ── revenue ──
+            'totalRevenue'   => $totalAmountCollected,
+            'memberRevenue'  => $memberRevenue,
+            'eventRevenue'   => $eventRevenue,
+            'renewalRevenue' => $renewalRevenue,
+
+            // ── monthly registrations (last 6 months) ──
+            'monthlyData' => MemberProfile::where('unit_id', $unitId)
+                ->selectRaw('MONTH(created_at) as month, YEAR(created_at) as year, COUNT(*) as count')
+                ->where('created_at', '>=', now()->subMonths(6))
+                ->groupBy('year', 'month')->orderBy('year')->orderBy('month')->get(),
+
+            // ── monthly revenue (last 6 months) ──
+            'monthlyRevenue' => Payment::whereIn('user_id', $unitUserIds)->where('status', 'SUCCESS')
+                ->selectRaw('MONTH(created_at) as month, YEAR(created_at) as year, SUM(amount) as total')
+                ->where('created_at', '>=', now()->subMonths(6))
+                ->groupBy('year', 'month')->orderBy('year')->orderBy('month')->get(),
+
+            // ── FUNDRAISING (this unit admin's own campaigns) ──
+            'fundraisingTotal'     => FundraisingCampaign::where('created_by', $userId)->count(),
+            'fundraisingActive'    => FundraisingCampaign::where('created_by', $userId)->where('status', 'ACTIVE')->count(),
+            'fundraisingCompleted' => FundraisingCampaign::where('created_by', $userId)->where('status', 'COMPLETED')->count(),
+            'fundraisingRaised'    => FundraisingCampaign::where('created_by', $userId)->sum('raised_amount'),
+            'fundraisingTarget'    => FundraisingCampaign::where('created_by', $userId)->sum('target_amount'),
+            'fundraisingCampaigns' => FundraisingCampaign::where('created_by', $userId)->latest()->take(10)->get(),
+
+            // ── COMMITTEES (own) ──
+            'committeeTotal'  => Committee::where('created_by', $userId)->count(),
+            'committeeActive' => Committee::where('created_by', $userId)->where('is_active', true)->count(),
+            'committeeList'   => Committee::where('created_by', $userId)->withCount('members')->latest()->take(10)->get(),
+
+            // ── OTHER FEES (own, payers scoped to this unit) ──
+            'otherFeeTotal'  => OtherFee::where('created_by', $userId)->count(),
+            'otherFeeActive' => OtherFee::where('created_by', $userId)->where('is_active', true)->count(),
+            'otherFeeCollected' => OtherFee::where('created_by', $userId)
+                ->withCount(['payments as paid_count' => function ($q) use ($unitId) {
+                    $q->where('status', 'PAID')->whereHas('memberProfile', fn($q2) => $q2->where('unit_id', $unitId));
+                }])
+                ->get()->sum(fn($f) => $f->paid_count * $f->amount),
+            'otherFeeList' => OtherFee::where('created_by', $userId)
+                ->withCount(['payments as payments_count' => function ($q) use ($unitId) {
+                    $q->whereHas('memberProfile', fn($q2) => $q2->where('unit_id', $unitId));
+                }])
+                ->latest()->take(10)->get(),
+
+            // ── SCHEMES (own, dues/members scoped to this unit) ──
+            'schemeTotal'  => Scheme::where('created_by', $userId)->count(),
+            'schemeActive' => Scheme::where('created_by', $userId)->where('is_active', true)->count(),
+            'schemeDuesPaid' => Scheme::where('created_by', $userId)
+                ->withCount(['dues as paid_dues' => function ($q) use ($unitId) {
+                    $q->where('status', 'PAID')->whereHas('memberProfile', fn($q2) => $q2->where('unit_id', $unitId));
+                }])->get()->sum('paid_dues'),
+            'schemeDuesPending' => Scheme::where('created_by', $userId)
+                ->withCount(['dues as pending_dues' => function ($q) use ($unitId) {
+                    $q->where('status', '!=', 'PAID')->whereHas('memberProfile', fn($q2) => $q2->where('unit_id', $unitId));
+                }])->get()->sum('pending_dues'),
+            'schemeList' => Scheme::where('created_by', $userId)
+                ->withCount([
+                    'dues as dues_count' => function ($q) use ($unitId) {
+                        $q->whereHas('memberProfile', fn($q2) => $q2->where('unit_id', $unitId));
+                    },
+                    'members as members_count' => function ($q) use ($unitId) {
+                        $q->where('unit_id', $unitId);
+                    },
+                ])->latest()->take(10)->get(),
+        ]);
+    }
+
+    // ─────────────────────────────────
+    // AJAX PREVIEW (member reports only)
+    // ─────────────────────────────────
+    public function preview(Request $request)
+    {
+        $unitId = $this->myUnitId();
+        $query  = MemberProfile::with(['user', 'unit', 'district', 'state'])
+                    ->where('unit_id', $unitId);
+
+        if ($request->filled('status'))    $query->where('status', $request->status);
+        if ($request->filled('month'))     $query->whereMonth('created_at', $request->month);
+        if ($request->filled('year'))      $query->whereYear('created_at', $request->year);
+        if ($request->filled('date_from')) $query->whereDate('created_at', '>=', $request->date_from);
+        if ($request->filled('date_to'))   $query->whereDate('created_at', '<=', $request->date_to);
+
+        $members = $query->latest()->get();
+
+        return response()->json([
+            'count'   => $members->count(),
+            'members' => $members->map(fn($m) => [
+                'name'            => $m->user->name,
+                'email'           => $m->user->email,
+                'phone'           => $m->user->phone,
+                'organization'    => $m->organization,
+                'membership_id'   => $m->membership_id ?? '—',
+                'status'          => $m->status,
+                'registered_on'   => $m->created_at->format('d M Y'),
+                'profile_image'   => $m->photo ? asset('storage/' . $m->photo) : null,
+            ]),
+        ]);
+    }
+
+    // ─────────────────────────────────
+    // CSV DOWNLOAD (member reports only)
+    // ─────────────────────────────────
+    public function download(Request $request)
+    {
+        $unitId   = $this->myUnitId();
+        $unit     = Unit::find($unitId);
+        $unitName = $unit?->name ?? 'unit';
+
+        $query = MemberProfile::with(['user', 'district', 'state'])
+                    ->where('unit_id', $unitId);
+
+        if ($request->filled('status'))    $query->where('status', $request->status);
+        if ($request->filled('month'))     $query->whereMonth('created_at', $request->month);
+        if ($request->filled('year'))      $query->whereYear('created_at', $request->year);
+        if ($request->filled('date_from')) $query->whereDate('created_at', '>=', $request->date_from);
+        if ($request->filled('date_to'))   $query->whereDate('created_at', '<=', $request->date_to);
+
+        $members  = $query->latest()->get();
+        $filename = 'eca_' . str_replace(' ', '_', strtolower($unitName)) . '_report_' . now()->format('d_M_Y') . '.csv';
+
+        $headers = [
+            'Content-Type'        => 'text/csv',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ];
+
+                $showState = !State::fixed(); // hide the State column when Kerala is fixed
+
+        $callback = function () use ($members, $showState) {
+            $file = fopen('php://output', 'w');
+
+            $header = [
+                'S.No', 'Name', 'Email', 'Phone',
+                'Organization', 'Membership ID',
+                'Status', 'District',
+            ];
+            if ($showState) $header[] = 'State';
+            array_push($header, 'Joined Date', 'Expiry Date', 'Registered On');
+            fputcsv($file, $header);
+
+            foreach ($members as $i => $m) {
+                $row = [
+                    $i + 1,
+                    $m->user->name, $m->user->email, $m->user->phone,
+                    $m->organization,
+                    $m->membership_id ?? '—',
+                    $m->status,
+                    $m->district->name,
+                ];
+                if ($showState) $row[] = $m->state->name;
+                array_push($row, $m->joined_date ?? '—', $m->expiry_date ?? '—', $m->created_at->format('d M Y'));
+                fputcsv($file, $row);
+            }
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+}
