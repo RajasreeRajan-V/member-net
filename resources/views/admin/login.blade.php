@@ -79,10 +79,10 @@
   <form method="POST" action="{{ route('admin.login.post') }}">
     @csrf
     <div class="fg">
-      <label>Email, Phone, or 6-Digit Unit ID</label>
+      <label>Email, Phone, or Unit ID</label>
       <input type="text" name="email"
              value="{{ old('email') }}"
-             placeholder="admin@eca.com, mobile, or 6-digit Unit ID" required autofocus>
+             placeholder="admin@eca.com, mobile, or Unit ID (e.g. KAN001)" required autofocus>
     </div>
     <div class="fg fg-last">
   <label>Password</label>

@@ -238,7 +238,7 @@
       <tbody id="unitTable">
         @foreach($units as $unit)
         <tr>
-          <td><span class="utag">{{ str_pad($unit->id, 6, '0', STR_PAD_LEFT) }}</span></td>
+          <td><span class="utag">{{ $unit->unit_id ?? str_pad($unit->id, 6, '0', STR_PAD_LEFT) }}</span></td>
           <td style="font-weight:600;">{{ $unit->name }}</td>
         </tr>
         @endforeach
@@ -327,7 +327,7 @@
       {{-- UNIT MATCHING NOTE --}}
       <div style="margin-top:10px;font-size:11px;color:var(--text-dim);">
         <i class="fas fa-info-circle" style="color:var(--accent)"></i>
-        <b>Unit</b> must be entered as either the <b>Unit Name</b> (e.g. <code>{{ $units->first()?->name ?? 'Vadakara' }}</code>) or its <b>6-digit Unit ID</b> (e.g. <code>{{ str_pad($units->first()?->id ?? 1, 6, '0', STR_PAD_LEFT) }}</code>) as listed in the reference table above.
+        <b>Unit</b> must be entered as either the <b>Unit Name</b> (e.g. <code>{{ $units->first()?->name ?? 'Vadakara' }}</code>) or its <b>Unit ID</b> (e.g. <code>{{ $units->first()?->unit_id ?? 'KAN001' }}</code>) as listed in the reference table above.
       </div>
 
       {{-- ADDRESS NOTE --}}

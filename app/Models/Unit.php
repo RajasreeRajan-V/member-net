@@ -9,6 +9,7 @@ class Unit extends Model
     protected $fillable = [
         'district_id',
         'name',
+        'unit_id',
         'is_active',
         'certificate_logo',
         'certificate_seal_text',
@@ -31,6 +32,31 @@ class Unit extends Model
             return asset('storage/' . $this->certificate_logo);
         }
         return asset('fumma-logo.png');
+    }
+
+    public function getFormattedIdAttribute(): string
+    {
+        return $this->unit_id ?? str_pad($this->id, 6, '0', STR_PAD_LEFT);
+    }
+
+    public static function generateUnitId(string $name, ?int $ignoreId = null): string
+    {
+        $letters = strtoupper(preg_replace('/[^A-Za-z]/', '', $name));
+        $prefix  = substr($letters . 'XXX', 0, 3);
+
+        $existing = static::where('unit_id', 'LIKE', $prefix . '%')
+            ->when($ignoreId, fn($q) => $q->where('id', '!=', $ignoreId))
+            ->pluck('unit_id');
+
+        $maxSerial = 0;
+        foreach ($existing as $uid) {
+            $serial = (int) substr($uid, 3);
+            if ($serial > $maxSerial) {
+                $maxSerial = $serial;
+            }
+        }
+
+        return $prefix . str_pad($maxSerial + 1, 3, '0', STR_PAD_LEFT);
     }
 
     protected function casts(): array

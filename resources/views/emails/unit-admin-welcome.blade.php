@@ -32,7 +32,7 @@
                                    style="background:#f9fafb;border:1px solid #e5e7eb;
                                           border-radius:6px;margin-bottom:18px;">
                                 <tr>
-                                    <td style="padding:14px 16px;font-size:13px;color:#6b7280;">Username (6-Digit Unit ID)</td>
+                                    <td style="padding:14px 16px;font-size:13px;color:#6b7280;">Username (Unit ID)</td>
                                     <td style="padding:14px 16px;font-size:15px;font-weight:700;
                                                color:#1f2937;text-align:right;font-family:monospace;letter-spacing:1px;">
                                         {{ str_pad($unitId, 6, '0', STR_PAD_LEFT) }}

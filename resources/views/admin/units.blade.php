@@ -16,6 +16,7 @@
       <thead>
         <tr>
           <th>#</th>
+          <th>Unit ID</th>
           <th>Unit Name</th>
           <th>District</th>
           @unless($fixedState)
@@ -29,6 +30,11 @@
         @forelse($units as $unit)
         <tr>
           <td style="color:var(--text-dim)">{{ $loop->iteration }}</td>
+          <td>
+            <span style="font-family:monospace;font-weight:700;color:var(--accent);background:rgba(79,142,247,0.1);padding:3px 8px;border-radius:6px;border:1px solid rgba(79,142,247,0.25);letter-spacing:1px;">
+              {{ $unit->unit_id ?? str_pad($unit->id, 6, '0', STR_PAD_LEFT) }}
+            </span>
+          </td>
           <td><b>{{ $unit->name }}</b></td>
           <td style="color:var(--text-dim)">
             {{ $unit->district->name }}
@@ -82,7 +88,7 @@
         </tr>
         @empty
         <tr>
-          <td colspan="{{ $fixedState ? 5 : 6 }}"
+          <td colspan="{{ $fixedState ? 6 : 7 }}"
             style="text-align:center;color:var(--text-dim);padding:30px;">
             No units yet
           </td>

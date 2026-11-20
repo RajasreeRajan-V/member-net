@@ -53,10 +53,16 @@ class LoginController extends Controller
             return redirect()->route('admin.dashboard');
         }
 
-        // 2. Check Unit Admin (allow login directly from main login page via 6-digit Unit ID, Email, or Phone)
+        // 2. Check Unit Admin (allow login directly from main login page via Unit ID, 6-digit ID, Email, or Phone)
         $unitUser = null;
 
-        // Try 6-digit Unit ID (or numeric <= 6 digits) first
+        // Try alphanumeric Unit ID (e.g. KAN001) first
+        $ua = \App\Models\UnitAdmin::whereHas('unit', fn($q) => $q->where('unit_id', strtoupper($loginInput)))->first();
+        if ($ua && $ua->user && $ua->user->role === 'unit_admin') {
+            $unitUser = $ua->user;
+        }
+
+        // Try 6-digit Unit ID (or numeric <= 6 digits)
         if (is_numeric($loginInput) && strlen($loginInput) <= 6) {
             $ua = \App\Models\UnitAdmin::where('unit_id', (int) $loginInput)->first();
             if ($ua && $ua->user && $ua->user->role === 'unit_admin') {

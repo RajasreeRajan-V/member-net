@@ -33,15 +33,21 @@ class LoginController extends Controller
         $password   = trim($request->password);
         $user       = null;
 
-        // 1. Try finding UnitAdmin by 6-digit Unit ID (or numeric <= 6 digits)
-        if (is_numeric($loginInput) && strlen($loginInput) <= 6) {
+        // 1. Try finding UnitAdmin by Unit ID (e.g. KAN001)
+        $ua = UnitAdmin::whereHas('unit', fn($q) => $q->where('unit_id', strtoupper($loginInput)))->first();
+        if ($ua && $ua->user && $ua->user->role === $this->role) {
+            $user = $ua->user;
+        }
+
+        // 2. Try finding UnitAdmin by 6-digit numeric Unit ID (or numeric <= 6 digits)
+        if (!$user && is_numeric($loginInput) && strlen($loginInput) <= 6) {
             $ua = UnitAdmin::where('unit_id', (int) $loginInput)->first();
             if ($ua && $ua->user && $ua->user->role === $this->role) {
                 $user = $ua->user;
             }
         }
 
-        // 2. Try by Unit Name if not found yet
+        // 3. Try by Unit Name if not found yet
         if (!$user && !filter_var($loginInput, FILTER_VALIDATE_EMAIL) && strlen($loginInput) < 10) {
             $ua = UnitAdmin::whereHas('unit', fn($q) => $q->where('name', $loginInput))->first();
             if ($ua && $ua->user && $ua->user->role === $this->role) {

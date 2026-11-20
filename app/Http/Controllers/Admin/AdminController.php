@@ -292,6 +292,7 @@ public function storeUnit(Request $request)
     Unit::create([
         'district_id' => $request->district_id,
         'name'        => trim($request->name),
+        'unit_id'     => Unit::generateUnitId($request->name),
         'is_active'   => true
     ]);
     return back()->with('success', 'Unit created successfully!');
@@ -312,9 +313,13 @@ public function storeUnit(Request $request)
             'name.regex' => 'Unit name can only contain letters, spaces, hyphens and apostrophes.',
         ]);
 
-        Unit::find($request->id)->update([
-            'name' => trim($request->name)
-        ]);
+        $unit = Unit::findOrFail($request->id);
+        $name = trim($request->name);
+        $updateData = ['name' => $name];
+        if (!$unit->unit_id || $unit->name !== $name) {
+            $updateData['unit_id'] = Unit::generateUnitId($name, $unit->id);
+        }
+        $unit->update($updateData);
         return back()->with('success', 'Unit updated successfully!');
     }
 
@@ -418,7 +423,7 @@ public function storeUnit(Request $request)
         // ── Send credentials email (wrapped so a bad address can't 500 this action) ──
         try {
             $unit = Unit::with('district')->find($request->unit_id);
-            $unitCode = str_pad($unit->id, 6, '0', STR_PAD_LEFT);
+            $unitCode = $unit->unit_id ?? str_pad($unit->id, 6, '0', STR_PAD_LEFT);
 
             Mail::to($user->email)->send(new \App\Mail\UnitAdminWelcomeMail(
                 adminName:    $user->name,
@@ -548,7 +553,7 @@ public function storeUnit(Request $request)
         if ($newPassword) {
             try {
                 $unit = Unit::with('district')->find($request->unit_id);
-                $unitCode = str_pad($unit->id, 6, '0', STR_PAD_LEFT);
+                $unitCode = $unit->unit_id ?? str_pad($unit->id, 6, '0', STR_PAD_LEFT);
 
                 Mail::to($user->email)->send(new \App\Mail\UnitAdminWelcomeMail(
                     adminName:    $user->name,
@@ -584,7 +589,7 @@ public function storeUnit(Request $request)
 
         try {
             $unit = Unit::with('district')->find($unitAdmin->unit_id);
-            $unitCode = str_pad($unit->id, 6, '0', STR_PAD_LEFT);
+            $unitCode = $unit->unit_id ?? str_pad($unit->id, 6, '0', STR_PAD_LEFT);
 
             Mail::to($user->email)->send(new \App\Mail\UnitAdminWelcomeMail(
                 adminName:    $user->name,
@@ -598,9 +603,11 @@ public function storeUnit(Request $request)
             Log::error('Unit Admin reset password email failed: ' . $e->getMessage());
         }
 
+        $unitDisplayId = $unit->unit_id ?? str_pad($unitAdmin->unit_id, 6, '0', STR_PAD_LEFT);
+
         return back()->with(
             'success',
-            'Password reset! Login credentials sent to ' . $user->email . ' (Username: ' . str_pad($unitAdmin->unit_id, 6, '0', STR_PAD_LEFT) . ', Password: ' . $newPassword . ').'
+            'Password reset! Login credentials sent to ' . $user->email . ' (Username: ' . $unitDisplayId . ', Password: ' . $newPassword . ').'
         );
     }
 
@@ -2185,6 +2192,11 @@ public function updateMember(Request $request)
             } else {
                 if (is_numeric($unitInput)) {
                     $unitModel = Unit::with('district')->find((int) $unitInput);
+                }
+                if (!$unitModel) {
+                    $unitModel = Unit::with('district')
+                        ->whereRaw('UPPER(TRIM(unit_id)) = ?', [strtoupper($unitInput)])
+                        ->first();
                 }
                 if (!$unitModel) {
                     $unitModel = Unit::with('district')

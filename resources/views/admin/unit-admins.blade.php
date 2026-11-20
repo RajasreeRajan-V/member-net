@@ -34,7 +34,7 @@
           <td style="color:var(--text-dim)">{{ $loop->iteration }}</td>
           <td>
             <span style="font-family:monospace;font-weight:700;color:#a78bfa;letter-spacing:1px;background:rgba(167,139,250,0.1);padding:3px 8px;border-radius:6px;border:1px solid rgba(167,139,250,0.25);">
-              {{ str_pad($ua->unit_id, 6, '0', STR_PAD_LEFT) }}
+              {{ $ua->unit->unit_id ?? str_pad($ua->unit_id, 6, '0', STR_PAD_LEFT) }}
             </span>
           </td>
           <td>
@@ -195,7 +195,7 @@
                   color:var(--text-dim);">
         <i class="fas fa-info-circle"
            style="color:var(--accent)"></i>
-        Login credentials: Username will be the 6-digit Unit ID (e.g. <b>000063</b>), and Password will be the <b>Phone Number</b>.
+        Login credentials: Username will be the Unit ID (e.g. <b>{{ $units->first()?->unit_id ?? 'KAN001' }}</b>), and Password will be the <b>Phone Number</b>.
       </div>
       <div class="ff">
         <button type="button" class="btn bo"

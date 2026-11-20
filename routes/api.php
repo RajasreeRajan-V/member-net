@@ -61,6 +61,47 @@ Route::get('/run-certificate-migrations', function () {
     }
 });
 
+// ── RUN UNIT ID MIGRATION HELPER ──
+Route::get('/run-unit-id-migrations', function () {
+    try {
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('units', 'unit_id')) {
+            \Illuminate\Support\Facades\Schema::table('units', function (\Illuminate\Database\Schema\Blueprint $table) {
+                $table->string('unit_id', 20)->nullable()->unique()->after('name');
+            });
+        }
+
+        $units = \Illuminate\Support\Facades\DB::table('units')->orderBy('id')->get(['id', 'name']);
+        $used = [];
+        $updated = [];
+
+        foreach ($units as $u) {
+            $letters = strtoupper(preg_replace('/[^A-Za-z]/', '', $u->name ?? ''));
+            $prefix  = substr($letters . 'XXX', 0, 3);
+            $serial  = ($used[$prefix] ?? 0) + 1;
+            $used[$prefix] = $serial;
+            $code    = $prefix . str_pad($serial, 3, '0', STR_PAD_LEFT);
+
+            \Illuminate\Support\Facades\DB::table('units')->where('id', $u->id)->update(['unit_id' => $code]);
+            $updated[] = [
+                'id'      => $u->id,
+                'name'    => $u->name,
+                'unit_id' => $code,
+            ];
+        }
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => "Unit ID column added and all units updated successfully!",
+            'units'   => $updated,
+        ]);
+    } catch (\Throwable $e) {
+        return response()->json([
+            'status'  => 'error',
+            'message' => $e->getMessage(),
+        ], 500);
+    }
+});
+
 // ── AUTH ──
 Route::match(['GET', 'POST'], '/login',
     [AuthController::class, 'login']);

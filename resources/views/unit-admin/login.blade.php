@@ -127,8 +127,8 @@
     <form method="POST" action="{{ route('unit-admin.login.post') }}">
       @csrf
       <div class="fg">
-        <label>Username (6-Digit Unit ID)</label>
-        <input type="text" name="email" value="{{ old('email') }}" placeholder="Enter 6-digit Unit ID (e.g. 000063)" required autofocus>
+        <label>Username / Unit ID</label>
+        <input type="text" name="email" value="{{ old('email') }}" placeholder="Enter Unit ID (e.g. KAN001)" required autofocus>
       </div>
       <div class="fg">
   <label>Password (Phone Number)</label>

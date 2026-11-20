@@ -14,8 +14,13 @@
               display:flex;align-items:center;justify-content:center;
               font-size:20px;flex-shrink:0;">🏢</div>
   <div style="flex:1;min-width:0;">
-    <div style="font-family:'Instrument Serif',serif;font-size:19px;color:var(--text);">
-      {{ $unit->name ?? 'Your Unit' }}
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <span style="font-family:'Instrument Serif',serif;font-size:20px;color:var(--text);">
+        {{ $unit->name ?? 'Your Unit' }}
+      </span>
+      <span style="font-family:monospace;font-size:11.5px;font-weight:700;color:var(--accent);background:rgba(79,142,247,0.15);padding:2px 8px;border-radius:6px;border:1px solid rgba(79,142,247,0.25);letter-spacing:0.5px;">
+        Unit ID: {{ $unit->unit_id ?? $unit->formatted_id }}
+      </span>
     </div>
     <div style="font-size:11px;color:var(--text-dim);margin-top:2px;">
             {{ $unit->district->name ?? '' }}
