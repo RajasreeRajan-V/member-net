@@ -9,6 +9,10 @@ use App\Models\News;
 use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Models\UnitAdmin;
+use App\Models\Unit;
+use App\Models\District;
+use App\Models\State;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -84,12 +88,24 @@ class UnitAdminController extends Controller
         $query  = MemberProfile::with(['user', 'unit', 'district', 'state'])
                     ->where('unit_id', $unitId);
 
+        if ($request->filled('search')) {
+            $search = trim($request->search);
+            $query->where(function ($q) use ($search) {
+                $q->where('membership_id', 'LIKE', "%{$search}%")
+                  ->orWhereHas('user', function ($uq) use ($search) {
+                      $uq->where('phone', 'LIKE', "%{$search}%")
+                         ->orWhere('name', 'LIKE', "%{$search}%");
+                  });
+            });
+        }
+
         if ($request->filled('status')) $query->where('status', $request->status);
 
         return view('unit-admin.members', [
             'members'          => $query->latest()->paginate(20),
             'status'           => $request->status,
             'membership_type'  => $request->membership_type,
+            'search'           => $request->search,
             'myUnit'           => \App\Models\Unit::with('district.state')->find($unitId),
         ]);
     }
@@ -155,8 +171,7 @@ class UnitAdminController extends Controller
                 $profile = \App\Models\MemberProfile::create([
                     'user_id'         => $user->id,
                     'unit_id'         => $unitAdmin->unit_id,
-                    'district_id'     => $unitAdmin->unit->district_id,
-                    'state_id'        => State::fixed()?->id ?? $unitAdmin->unit->district->state_id,
+                    'state_id'        => \App\Models\State::fixed()?->id ?? 1,
                     'status'          => 'PENDING',
                     'dob'             => $request->dob,
                     'organization'    => $request->organization,
@@ -202,7 +217,7 @@ class UnitAdminController extends Controller
             }
         }
 
-        $fummaNote = $isFummaMember ? ' FUMMA member: Yes.' : ' FUMMA member: No.';
+        $fummaNote = $isFummaMember ? ' Member Net: Yes.' : ' Member Net: No.';
 
         return back()->with(
             'success',
@@ -215,28 +230,114 @@ class UnitAdminController extends Controller
     public function memberDetail($id)
     {
         $unitId = $this->myUnitId();
-        $member = MemberProfile::with(['user', 'unit', 'district', 'state'])
+        $member = MemberProfile::with(['user', 'unit', 'state', 'schemes'])
                     ->where('unit_id', $unitId)
                     ->findOrFail($id);
 
+        $schemes = $member->schemes->map(function ($s) {
+            return [
+                'id'              => $s->id,
+                'title'           => $s->title,
+                'amount'          => (float) $s->amount,
+                'duration_months' => $s->duration_months,
+                'start_date'      => $s->start_date ? $s->start_date->format('d M Y') : '—',
+                'end_date'        => $s->end_date ? $s->end_date->format('d M Y') : '—',
+                'is_active'       => (bool) $s->is_active,
+            ];
+        });
+
+        $joinedDate = $member->joined_date
+            ? (is_string($member->joined_date) ? date('d M Y', strtotime($member->joined_date)) : $member->joined_date->format('d M Y'))
+            : '—';
+        $expiryDate = $member->expiry_date
+            ? (is_string($member->expiry_date) ? date('d M Y', strtotime($member->expiry_date)) : $member->expiry_date->format('d M Y'))
+            : '—';
+
         return response()->json([
-            'name'          => $member->user->name ?? '—',
-            'email'         => $member->user->email ?? '—',
-            'phone'         => $member->user->phone ?? '—',
-            'dob'           => $member->dob,
-            'organization'  => $member->organization,
-            'address'       => $member->address,
-            'photo'         => $member->photo
+            'id'              => $member->id,
+            'name'            => $member->user->name ?? '—',
+            'email'           => $member->user->email ?? '—',
+            'phone'           => $member->user->phone ?? '—',
+            'dob'             => $member->dob,
+            'organization'    => $member->organization,
+            'address'         => $member->address,
+            'photo'           => $member->photo
                                 ? asset('storage/' . $member->photo)
                                 : null,
-            'unit_name'     => $member->unit->name ?? '—',
-            'district_name' => $member->district->name ?? '—',
-            'state_name'    => $member->state->name ?? '—',
-            'membership_id' => $member->membership_id ?? '—',
-            'status'        => $member->status,
-            'joined_date'   => $member->joined_date ?? '—',
-            'expiry_date'   => $member->expiry_date ?? '—',
-            'registered_on' => $member->created_at->format('d M Y'),
+            'unit_name'       => $member->unit->name ?? '—',
+            'state_name'      => $member->state->name ?? 'Kerala',
+            'membership_id'   => $member->membership_id ?? '—',
+            'membership_type' => $member->membership_type ?? 'ANNUAL',
+            'is_fumma_member' => (bool) $member->is_fumma_member,
+            'status'          => $member->status,
+            'joined_date'     => $joinedDate,
+            'expiry_date'     => $expiryDate,
+            'registered_on'   => $member->created_at ? $member->created_at->format('d M Y') : '—',
+            'total_schemes'   => $schemes->count(),
+            'schemes'         => $schemes,
+        ]);
+    }
+
+    public function downloadMemberDetail($id)
+    {
+        $unitId = $this->myUnitId();
+        $member = MemberProfile::with(['user', 'unit', 'state', 'schemes'])
+                    ->where('unit_id', $unitId)
+                    ->findOrFail($id);
+
+        $safeName = preg_replace('/[^A-Za-z0-9_\-]/', '_', $member->membership_id ?: ($member->user->name ?? 'member'));
+        $filename = 'member_' . strtolower($safeName) . '_details.xls';
+
+        $content = view('exports.member-single-excel', compact('member'))->render();
+
+        return response($content, 200, [
+            'Content-Type'        => 'application/vnd.ms-excel; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            'Cache-Control'       => 'max-age=0',
+        ]);
+    }
+
+    public function downloadMembers(Request $request)
+    {
+        $unitId   = $this->myUnitId();
+        $unit     = \App\Models\Unit::find($unitId);
+        $unitName = $unit?->name ?? 'unit';
+
+        $query = MemberProfile::with(['user', 'unit', 'state', 'schemes'])
+                    ->where('unit_id', $unitId);
+
+        $scopeParts = ['Unit: ' . $unitName];
+        if ($request->filled('search')) {
+            $search = trim($request->search);
+            $query->where(function ($q) use ($search) {
+                $q->where('membership_id', 'LIKE', "%{$search}%")
+                  ->orWhereHas('user', function ($uq) use ($search) {
+                      $uq->where('phone', 'LIKE', "%{$search}%")
+                         ->orWhere('name', 'LIKE', "%{$search}%");
+                  });
+            });
+            $scopeParts[] = 'Search: ' . $search;
+        }
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+            $scopeParts[] = 'Status: ' . ucfirst($request->status);
+        }
+
+        $members  = $query->latest()->get();
+        $filename = 'members_' . strtolower(preg_replace('/[^A-Za-z0-9_\-]/', '_', $unitName)) . '_' . now()->format('d_M_Y') . '.xls';
+        $scopeDescription = implode(' | ', $scopeParts);
+
+        $content = view('exports.members-excel', [
+            'title'            => 'Member Net - ' . $unitName . ' Members Directory',
+            'members'          => $members,
+            'generatedAt'      => now()->format('d M Y, h:i A'),
+            'scopeDescription' => $scopeDescription,
+        ])->render();
+
+        return response($content, 200, [
+            'Content-Type'        => 'application/vnd.ms-excel; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            'Cache-Control'       => 'max-age=0',
         ]);
     }
 
@@ -387,6 +488,183 @@ class UnitAdminController extends Controller
                 contactEmail: $unitAdminEmail,
                 loginUrl:     url('/member/login'),
             ));
+    }
+
+    // ─────────────────────────────────
+    // NON-MEMBERS (Third-Party)
+    // ─────────────────────────────────
+    public function nonMembers(Request $request)
+    {
+        $unitId = $this->myUnitId();
+        $query = \App\Models\SchemeThirdPartyMember::with(['unit', 'schemes'])
+            ->where('unit_id', $unitId)
+            ->withCount('schemes');
+
+        if ($request->filled('search')) {
+            $search = trim($request->search);
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'LIKE', "%{$search}%")
+                  ->orWhere('phone', 'LIKE', "%{$search}%")
+                  ->orWhere('email', 'LIKE', "%{$search}%")
+                  ->orWhere('organization', 'LIKE', "%{$search}%");
+            });
+        }
+
+        return view('unit-admin.non-members', [
+            'nonMembers' => $query->latest()->paginate(20),
+            'schemes'    => \App\Models\Scheme::where('created_by', Auth::id())->where('is_active', true)->orderBy('title')->get(),
+            'myUnit'     => \App\Models\Unit::find($unitId),
+            'search'     => $request->search,
+        ]);
+    }
+
+    public function storeNonMember(Request $request)
+    {
+        $unitId = $this->myUnitId();
+
+        $request->validate([
+            'name'         => 'required|string|max:150',
+            'phone'        => 'required|string|max:20',
+            'email'        => 'nullable|email|max:150',
+            'dob'          => 'nullable|date',
+            'organization' => 'nullable|string|max:150',
+            'address'      => 'nullable|string|max:500',
+            'photo'        => 'nullable|image|max:2048',
+            'scheme_ids'   => 'nullable|array',
+            'scheme_ids.*' => 'exists:schemes,id',
+        ]);
+
+        $photoPath = null;
+        if ($request->hasFile('photo')) {
+            $photoPath = $request->file('photo')->store('third_party_photos', 'public');
+        }
+
+        $nonMember = \App\Models\SchemeThirdPartyMember::create([
+            'name'         => trim($request->name),
+            'phone'        => trim($request->phone),
+            'email'        => $request->filled('email') ? trim($request->email) : null,
+            'dob'          => $request->dob ?: null,
+            'organization' => $request->organization ?: null,
+            'address'      => $request->address ?: null,
+            'photo'        => $photoPath,
+            'unit_id'      => $unitId,
+            'created_by'   => Auth::id(),
+        ]);
+
+        if ($request->filled('scheme_ids')) {
+            $nonMember->schemes()->sync($request->scheme_ids);
+            foreach ($request->scheme_ids as $schemeId) {
+                $scheme = \App\Models\Scheme::where('created_by', Auth::id())->find($schemeId);
+                if ($scheme) {
+                    $this->generateThirdPartyDues($scheme, [$nonMember->id]);
+                }
+            }
+        }
+
+        return back()->with('success', "Non-member '{$nonMember->name}' created successfully!");
+    }
+
+    public function updateNonMember(Request $request)
+    {
+        $unitId = $this->myUnitId();
+
+        $request->validate([
+            'id'           => 'required|exists:scheme_third_party_members,id',
+            'name'         => 'required|string|max:150',
+            'phone'        => 'required|string|max:20',
+            'email'        => 'nullable|email|max:150',
+            'dob'          => 'nullable|date',
+            'organization' => 'nullable|string|max:150',
+            'address'      => 'nullable|string|max:500',
+            'photo'        => 'nullable|image|max:2048',
+            'scheme_ids'   => 'nullable|array',
+            'scheme_ids.*' => 'exists:schemes,id',
+        ]);
+
+        $nonMember = \App\Models\SchemeThirdPartyMember::where('unit_id', $unitId)->findOrFail($request->id);
+
+        $data = [
+            'name'         => trim($request->name),
+            'phone'        => trim($request->phone),
+            'email'        => $request->filled('email') ? trim($request->email) : null,
+            'dob'          => $request->dob ?: null,
+            'organization' => $request->organization ?: null,
+            'address'      => $request->address ?: null,
+        ];
+
+        if ($request->hasFile('photo')) {
+            $data['photo'] = $request->file('photo')->store('third_party_photos', 'public');
+        }
+
+        $nonMember->update($data);
+
+        $schemeIds = $request->input('scheme_ids', []);
+        $nonMember->schemes()->sync($schemeIds);
+        foreach ($schemeIds as $schemeId) {
+            $scheme = \App\Models\Scheme::where('created_by', Auth::id())->find($schemeId);
+            if ($scheme) {
+                $this->generateThirdPartyDues($scheme, [$nonMember->id]);
+            }
+        }
+
+        return back()->with('success', "Non-member '{$nonMember->name}' updated successfully!");
+    }
+
+    public function deleteNonMember(Request $request)
+    {
+        $unitId = $this->myUnitId();
+        $request->validate(['id' => 'required|exists:scheme_third_party_members,id']);
+
+        $nonMember = \App\Models\SchemeThirdPartyMember::where('unit_id', $unitId)->findOrFail($request->id);
+        $name = $nonMember->name;
+
+        $nonMember->schemes()->detach();
+        $nonMember->dues()->delete();
+        $nonMember->delete();
+
+        return back()->with('success', "Non-member '{$name}' deleted successfully!");
+    }
+
+    public function nonMemberDetail($id)
+    {
+        $unitId = $this->myUnitId();
+        $nonMember = \App\Models\SchemeThirdPartyMember::with(['unit', 'schemes'])
+            ->where('unit_id', $unitId)
+            ->findOrFail($id);
+
+        $dues = \App\Models\SchemeFeeDue::with('scheme')
+            ->where('third_party_member_id', $nonMember->id)
+            ->get();
+
+        return response()->json([
+            'id'           => $nonMember->id,
+            'name'         => $nonMember->name,
+            'phone'        => $nonMember->phone,
+            'email'        => $nonMember->email ?: '—',
+            'dob'          => $nonMember->dob ? $nonMember->dob->format('Y-m-d') : null,
+            'dob_formatted'=> $nonMember->dob ? $nonMember->dob->format('d M Y') : '—',
+            'organization' => $nonMember->organization ?: '—',
+            'address'      => $nonMember->address ?: '—',
+            'unit_name'    => $nonMember->unit->name ?? '—',
+            'photo_url'    => $nonMember->photo ? asset('storage/' . $nonMember->photo) : null,
+            'created_at'   => $nonMember->created_at ? $nonMember->created_at->format('d M Y, h:i A') : '—',
+            'scheme_ids'   => $nonMember->schemes->pluck('id'),
+            'schemes'      => $nonMember->schemes->map(function ($s) use ($dues) {
+                $schemeDues = $dues->where('scheme_id', $s->id);
+                return [
+                    'id'          => $s->id,
+                    'title'       => $s->title,
+                    'amount'      => number_format((float)$s->amount, 2),
+                    'duration'    => $s->duration_months,
+                    'start_date'  => $s->start_date?->format('d M Y') ?? '—',
+                    'end_date'    => $s->end_date?->format('d M Y') ?? '—',
+                    'is_active'   => (bool)$s->is_active,
+                    'dues_count'  => $schemeDues->count(),
+                    'paid_count'  => $schemeDues->where('status', 'PAID')->count(),
+                    'total_paid'  => number_format((float)$schemeDues->where('status', 'PAID')->sum('amount'), 2),
+                ];
+            }),
+        ]);
     }
 
     // ─────────────────────────────────
@@ -793,11 +1071,8 @@ class UnitAdminController extends Controller
             'csv_file' => 'required|file|mimes:csv,txt|max:2048',
         ]);
 
-        $unitAdmin  = \App\Models\UnitAdmin::with('unit.district.state')
-                        ->where('user_id', Auth::id())->first();
+        $unitAdmin  = \App\Models\UnitAdmin::where('user_id', Auth::id())->first();
         $unitId     = $unitAdmin->unit_id;
-        $districtId = $unitAdmin->unit->district_id;
-        $stateId    = State::fixed()?->id ?? $unitAdmin->unit->district->state_id;
 
         $handle = fopen($request->file('csv_file')->getRealPath(), 'r');
         fgetcsv($handle); // skip header
@@ -894,7 +1169,19 @@ class UnitAdminController extends Controller
             $isFummaMember = app(\App\Services\FummaMemberService::class)->isActive($data['phone']) ? 1 : 0;
 
             try {
-                \Illuminate\Support\Facades\DB::transaction(function () use ($data, $email, $dob, $unitId, $districtId, $stateId, $isFummaMember) {
+                $profile = \Illuminate\Support\Facades\DB::transaction(function () use ($data, $email, $dob, $unitId, $districtId, $stateId, $isFummaMember) {
+                    // Purge soft-deleted conflicting accounts if any
+                    if ($email) {
+                        $conflicting = \App\Models\User::withTrashed()->where('email', $email)->first();
+                        if ($conflicting && $conflicting->trashed()) {
+                            $conflicting->forceDelete();
+                        }
+                    }
+                    $conflictingPhone = \App\Models\User::withTrashed()->where('phone', $data['phone'])->first();
+                    if ($conflictingPhone && $conflictingPhone->trashed()) {
+                        $conflictingPhone->forceDelete();
+                    }
+
                     $user = \App\Models\User::create([
                         'name'      => $data['name'],
                         'email'     => $email,   // null when left blank
@@ -904,11 +1191,10 @@ class UnitAdminController extends Controller
                         'is_active' => true,
                     ]);
 
-                    \App\Models\MemberProfile::create([
+                    $profile = \App\Models\MemberProfile::create([
                         'user_id'         => $user->id,
                         'unit_id'         => $unitId,
-                        'district_id'     => $districtId,
-                        'state_id'        => $stateId,
+                        'state_id'        => \App\Models\State::fixed()?->id ?? 1,
                         'status'          => 'PENDING',
                         'dob'             => $dob,
                         'organization'    => $data['organization'],
@@ -916,12 +1202,29 @@ class UnitAdminController extends Controller
                         'photo'           => null,
                         'is_fumma_member' => $isFummaMember,
                     ]);
+
+                    // Automatically approve admin-imported members
+                    return app(\App\Services\MembershipService::class)->approve($profile);
                 });
+
+                if (!empty($email)) {
+                    try {
+                        Mail::to($email)->send(new \App\Mail\MemberApprovedMail(
+                            memberName:   $data['name'],
+                            membershipId: $profile->membership_id,
+                            unitName:     $unitAdmin->unit->name ?? 'ECA Unit',
+                            phone:        $data['phone'],
+                        ));
+                    } catch (\Throwable $e) {
+                        Log::error('Bulk import approval email failed: ' . $e->getMessage());
+                    }
+                }
 
                 $results['success'][] = [
                     'row'             => $rowNumber,
                     'name'            => $data['name'],
                     'email'           => $email,
+                    'membership_id'   => $profile->membership_id,
                     'is_fumma_member' => $isFummaMember,
                 ];
                 $results['created']++;
@@ -1503,11 +1806,15 @@ class UnitAdminController extends Controller
             'schemes' => \App\Models\Scheme::where('created_by', Auth::id())
                 ->withCount([
                     'dues as dues_count' => function ($q) use ($unitId) {
-                        $q->whereHas('memberProfile', function ($q2) use ($unitId) {
-                            $q2->where('unit_id', $unitId);
+                        $q->where(function ($sq) use ($unitId) {
+                            $sq->whereHas('memberProfile', fn($q2) => $q2->where('unit_id', $unitId))
+                               ->orWhereHas('thirdPartyMember', fn($q3) => $q3->where('unit_id', $unitId));
                         });
                     },
                     'members as members_count' => function ($q) use ($unitId) {
+                        $q->where('unit_id', $unitId);
+                    },
+                    'thirdPartyMembers as third_party_members_count' => function ($q) use ($unitId) {
                         $q->where('unit_id', $unitId);
                     },
                 ])
@@ -1517,7 +1824,63 @@ class UnitAdminController extends Controller
                 ->where('unit_id', $unitId)
                 ->where('status', 'APPROVED')
                 ->get(),
+            'thirdPartyMembers' => \App\Models\SchemeThirdPartyMember::where('unit_id', $unitId)
+                ->latest()
+                ->get(),
+            'myUnit' => \App\Models\Unit::find($unitId),
         ]);
+    }
+
+    public function storeThirdPartyMember(Request $request)
+    {
+        $unitId = $this->myUnitId();
+
+        $request->validate([
+            'name'         => 'required|string|max:150',
+            'email'        => 'nullable|email|max:150',
+            'phone'        => 'required|string|max:20',
+            'dob'          => 'nullable|date',
+            'organization' => 'nullable|string|max:150',
+            'address'      => 'nullable|string|max:500',
+            'photo'        => 'nullable|image|max:2048',
+        ]);
+
+        $photoPath = null;
+        if ($request->hasFile('photo')) {
+            $photoPath = $request->file('photo')->store('third_party_photos', 'public');
+        }
+
+        $tpMember = \App\Models\SchemeThirdPartyMember::create([
+            'name'         => trim($request->name),
+            'email'        => $request->filled('email') ? trim($request->email) : null,
+            'phone'        => trim($request->phone),
+            'dob'          => $request->dob ?: null,
+            'organization' => $request->organization ?: null,
+            'address'      => $request->address ?: null,
+            'photo'        => $photoPath,
+            'unit_id'      => $unitId,
+            'created_by'   => Auth::id(),
+        ]);
+
+        $tpMember->load('unit');
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Third-party member created successfully!',
+                'member'  => [
+                    'id'           => $tpMember->id,
+                    'name'         => $tpMember->name,
+                    'email'        => $tpMember->email ?: '—',
+                    'phone'        => $tpMember->phone,
+                    'organization' => $tpMember->organization ?? '—',
+                    'unit_name'    => $tpMember->unit->name ?? '—',
+                    'photo_url'    => $tpMember->photo ? asset('storage/' . $tpMember->photo) : null,
+                ],
+            ]);
+        }
+
+        return back()->with('success', 'Third-party member added successfully!');
     }
 
     public function storeScheme(Request $request)
@@ -1525,21 +1888,52 @@ class UnitAdminController extends Controller
         $unitId = $this->myUnitId();
 
         $request->validate([
-            'title'           => 'required|string',
-            'description'     => 'nullable|string',
-            'amount'          => 'required|numeric|min:0.01',
-            'duration_months' => 'required|integer|min:1',
-            'start_date'      => 'required|date',
-            'end_date'        => 'nullable|date|after_or_equal:start_date',
-            'member_ids'      => 'required|array|min:1',
-            'member_ids.*'    => 'exists:member_profiles,id',
-        ], [
-            'member_ids.required' => 'Select at least one member for this scheme.',
+            'title'                  => 'required|string|max:200',
+            'description'            => 'nullable|string',
+            'amount'                 => 'required|numeric|min:0.01',
+            'duration_months'        => 'required|integer|min:1',
+            'start_date'             => 'required|date',
+            'end_date'               => 'nullable|date|after_or_equal:start_date',
+            'member_ids'             => 'nullable|array',
+            'member_ids.*'           => 'exists:member_profiles,id',
+            'third_party_member_ids' => 'nullable|array',
+            'third_party_member_ids.*' => 'exists:scheme_third_party_members,id',
         ]);
 
+        $selectedRegistered = $request->input('member_ids', []);
+        $selectedThirdParty = $request->input('third_party_member_ids', []);
+
+        // Inline third-party member creation if submitted with the form
+        if ($request->filled('tp_name') && $request->filled('tp_phone')) {
+            $photoPath = null;
+            if ($request->hasFile('tp_photo')) {
+                $photoPath = $request->file('tp_photo')->store('third_party_photos', 'public');
+            }
+            $newTp = \App\Models\SchemeThirdPartyMember::create([
+                'name'         => trim($request->tp_name),
+                'email'        => $request->filled('tp_email') ? trim($request->tp_email) : null,
+                'phone'        => trim($request->tp_phone),
+                'dob'          => $request->tp_dob ?: null,
+                'organization' => $request->tp_organization ?: null,
+                'address'      => $request->tp_address ?: null,
+                'photo'        => $photoPath,
+                'unit_id'      => $unitId,
+                'created_by'   => Auth::id(),
+            ]);
+            $selectedThirdParty[] = $newTp->id;
+        }
+
         $validMemberIds = \App\Models\MemberProfile::where('unit_id', $unitId)
-            ->whereIn('id', $request->member_ids)
+            ->whereIn('id', $selectedRegistered)
             ->pluck('id');
+
+        $validThirdPartyIds = \App\Models\SchemeThirdPartyMember::where('unit_id', $unitId)
+            ->whereIn('id', $selectedThirdParty)
+            ->pluck('id');
+
+        if ($validMemberIds->isEmpty() && $validThirdPartyIds->isEmpty()) {
+            return back()->withErrors(['member_ids' => 'Select at least one member (registered or external third-party) for this scheme.'])->withInput();
+        }
 
         $scheme = \App\Models\Scheme::create([
             'title'           => $request->title,
@@ -1553,8 +1947,13 @@ class UnitAdminController extends Controller
         ]);
 
         $scheme->members()->sync($validMemberIds);
+        $scheme->thirdPartyMembers()->sync($validThirdPartyIds);
 
-        return back()->with('success', 'Scheme created successfully! Applied to ' . $validMemberIds->count() . ' selected member(s).');
+        // Generate dues for third-party members
+        $this->generateThirdPartyDues($scheme, $validThirdPartyIds->toArray());
+
+        $totalCount = $validMemberIds->count() + $validThirdPartyIds->count();
+        return back()->with('success', "Scheme created successfully! Applied to {$totalCount} member(s) ({$validMemberIds->count()} registered, {$validThirdPartyIds->count()} third-party).");
     }
 
     public function updateScheme(Request $request)
@@ -1562,21 +1961,36 @@ class UnitAdminController extends Controller
         $unitId = $this->myUnitId();
 
         $request->validate([
-            'id'              => 'required|exists:schemes,id',
-            'title'           => 'required|string',
-            'description'     => 'nullable|string',
-            'amount'          => 'required|numeric|min:0.01',
-            'duration_months' => 'required|integer|min:1',
-            'start_date'      => 'required|date',
-            'end_date'        => 'nullable|date|after_or_equal:start_date',
-            'member_ids'      => 'required|array|min:1',
-            'member_ids.*'    => 'exists:member_profiles,id',
-        ], [
-            'member_ids.required' => 'Select at least one member for this scheme.',
+            'id'                     => 'required|exists:schemes,id',
+            'title'                  => 'required|string|max:200',
+            'description'            => 'nullable|string',
+            'amount'                 => 'required|numeric|min:0.01',
+            'duration_months'        => 'required|integer|min:1',
+            'start_date'             => 'required|date',
+            'end_date'               => 'nullable|date|after_or_equal:start_date',
+            'member_ids'             => 'nullable|array',
+            'member_ids.*'           => 'exists:member_profiles,id',
+            'third_party_member_ids' => 'nullable|array',
+            'third_party_member_ids.*' => 'exists:scheme_third_party_members,id',
         ]);
 
         $scheme = \App\Models\Scheme::where('created_by', Auth::id())
             ->findOrFail($request->id);
+
+        $selectedRegistered = $request->input('member_ids', []);
+        $selectedThirdParty = $request->input('third_party_member_ids', []);
+
+        $validMemberIds = \App\Models\MemberProfile::where('unit_id', $unitId)
+            ->whereIn('id', $selectedRegistered)
+            ->pluck('id');
+
+        $validThirdPartyIds = \App\Models\SchemeThirdPartyMember::where('unit_id', $unitId)
+            ->whereIn('id', $selectedThirdParty)
+            ->pluck('id');
+
+        if ($validMemberIds->isEmpty() && $validThirdPartyIds->isEmpty()) {
+            return back()->withErrors(['member_ids' => 'Select at least one member (registered or external third-party) for this scheme.'])->withInput();
+        }
 
         $scheme->update([
             'title'           => $request->title,
@@ -1587,41 +2001,90 @@ class UnitAdminController extends Controller
             'end_date'        => $request->end_date,
         ]);
 
-        $validMemberIds = \App\Models\MemberProfile::where('unit_id', $unitId)
-            ->whereIn('id', $request->member_ids)
-            ->pluck('id');
-
         $scheme->members()->sync($validMemberIds);
+        $scheme->thirdPartyMembers()->sync($validThirdPartyIds);
 
-        return back()->with('success', 'Scheme updated successfully! Now applies to ' . $validMemberIds->count() . ' selected member(s).');
+        // Generate dues for third-party members
+        $this->generateThirdPartyDues($scheme, $validThirdPartyIds->toArray());
+
+        $totalCount = $validMemberIds->count() + $validThirdPartyIds->count();
+        return back()->with('success', "Scheme updated successfully! Now applies to {$totalCount} member(s).");
+    }
+
+    private function generateThirdPartyDues(\App\Models\Scheme $scheme, array $thirdPartyIds): void
+    {
+        foreach ($thirdPartyIds as $tpId) {
+            for ($m = 0; $m < $scheme->duration_months; $m++) {
+                $dueDate = \Carbon\Carbon::parse($scheme->start_date)->copy()->addMonths($m);
+                $monthYear = $dueDate->format('Y-m');
+
+                $exists = \App\Models\SchemeFeeDue::where('scheme_id', $scheme->id)
+                    ->where('third_party_member_id', $tpId)
+                    ->where('month_year', $monthYear)
+                    ->exists();
+
+                if (!$exists) {
+                    \App\Models\SchemeFeeDue::create([
+                        'scheme_id'             => $scheme->id,
+                        'third_party_member_id' => $tpId,
+                        'member_profile_id'     => null,
+                        'amount'                => $scheme->amount,
+                        'due_date'              => $dueDate->copy()->startOfMonth()->addDays(9),
+                        'status'                => 'DUE',
+                        'month_year'            => $monthYear,
+                    ]);
+                }
+            }
+        }
     }
 
     public function schemeDetail($id)
     {
         $unitId = $this->myUnitId();
 
-        $scheme = \App\Models\Scheme::with(['members' => function ($q) use ($unitId) {
-                $q->where('unit_id', $unitId)->with('user');
-            }])
+        $scheme = \App\Models\Scheme::with([
+                'members' => function ($q) use ($unitId) {
+                    $q->where('unit_id', $unitId)->with(['user', 'unit']);
+                },
+                'thirdPartyMembers' => function ($q) use ($unitId) {
+                    $q->where('unit_id', $unitId)->with('unit');
+                }
+            ])
             ->where('created_by', Auth::id())
             ->find($id);
 
         if (!$scheme) return response()->json(['error' => 'Not found'], 404);
 
         return response()->json([
-            'title'           => $scheme->title,
-            'description'     => $scheme->description,
-            'amount'          => $scheme->amount,
-            'duration_months' => $scheme->duration_months,
-            'start_date_raw'  => $scheme->start_date?->format('Y-m-d'),
-            'end_date_raw'    => $scheme->end_date?->format('Y-m-d'),
-            'is_active'       => $scheme->is_active,
-            'member_ids'      => $scheme->members->pluck('id'),
-            'members'         => $scheme->members->map(function ($m) {
+            'title'                  => $scheme->title,
+            'description'            => $scheme->description,
+            'amount'                 => $scheme->amount,
+            'duration_months'        => $scheme->duration_months,
+            'start_date_raw'         => $scheme->start_date?->format('Y-m-d'),
+            'end_date_raw'           => $scheme->end_date?->format('Y-m-d'),
+            'is_active'              => $scheme->is_active,
+            'member_ids'             => $scheme->members->pluck('id'),
+            'third_party_member_ids' => $scheme->thirdPartyMembers->pluck('id'),
+            'members'                => $scheme->members->map(function ($m) {
                 return [
-                    'id'    => $m->id,
-                    'name'  => $m->user->name ?? '—',
-                    'email' => $m->user->email ?? '—',
+                    'id'             => $m->id,
+                    'name'           => $m->user->name ?? '—',
+                    'email'          => $m->user->email ?? '—',
+                    'phone'          => $m->user->phone ?? '—',
+                    'unit'           => $m->unit->name ?? '—',
+                    'is_third_party' => false,
+                ];
+            }),
+            'third_party_members'    => $scheme->thirdPartyMembers->map(function ($tp) {
+                return [
+                    'id'             => $tp->id,
+                    'name'           => $tp->name,
+                    'email'          => $tp->email ?: '—',
+                    'phone'          => $tp->phone,
+                    'organization'   => $tp->organization ?: '—',
+                    'unit'           => $tp->unit->name ?? '—',
+                    'photo'          => $tp->photo ? asset('storage/' . $tp->photo) : null,
+                    'is_third_party' => true,
                 ];
             }),
         ]);
@@ -1667,16 +2130,45 @@ class UnitAdminController extends Controller
         }
 
         $dues = $scheme->dues()
-            ->whereHas('memberProfile', function ($q) use ($unitId) {
-                $q->where('unit_id', $unitId);
+            ->where(function ($q) use ($unitId) {
+                $q->whereHas('memberProfile', fn($q2) => $q2->where('unit_id', $unitId))
+                  ->orWhereHas('thirdPartyMember', fn($q3) => $q3->where('unit_id', $unitId));
             })
-            ->with(['memberProfile.user', 'memberProfile.unit'])
+            ->with(['memberProfile.user', 'memberProfile.unit', 'thirdPartyMember.unit'])
             ->get();
 
         return view('unit-admin.scheme-payers', [
             'scheme' => $scheme,
             'dues'   => $dues,
         ]);
+    }
+
+    public function recordSchemeDuePayment(Request $request)
+    {
+        $unitId = $this->myUnitId();
+
+        $request->validate([
+            'due_id'         => 'required|exists:scheme_fee_dues,id',
+            'payment_method' => 'required|string|max:50',
+            'paid_date'      => 'required|date',
+            'notes'          => 'nullable|string|max:255',
+        ]);
+
+        $due = \App\Models\SchemeFeeDue::whereHas('scheme', fn($q) => $q->where('created_by', Auth::id()))
+            ->where(function ($q) use ($unitId) {
+                $q->whereHas('memberProfile', fn($q2) => $q2->where('unit_id', $unitId))
+                  ->orWhereHas('thirdPartyMember', fn($q3) => $q3->where('unit_id', $unitId));
+            })
+            ->findOrFail($request->due_id);
+
+        $due->update([
+            'status'         => 'PAID',
+            'paid_date'      => $request->paid_date,
+            'payment_method' => $request->payment_method,
+            'notes'          => $request->notes,
+        ]);
+
+        return back()->with('success', 'Payment recorded successfully!');
     }
 
     // ─────────────────────────────────
@@ -1810,6 +2302,216 @@ class UnitAdminController extends Controller
             'paid_to'      => $expense->paid_to,
             'status'       => $expense->status,
         ]);
+    }
+
+    // ─────────────────────────────────
+    // CERTIFICATE CONFIGURATION
+    // ─────────────────────────────────
+    private function ensureCertificateColumnsExist(): void
+    {
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('units', 'certificate_logo') ||
+            !\Illuminate\Support\Facades\Schema::hasColumn('units', 'signatory_1_name')) {
+            try {
+                \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+            } catch (\Throwable $e) {
+                // If artisan migrate is blocked or files not uploaded, run direct DDL
+            }
+
+            try {
+                \Illuminate\Support\Facades\Schema::table('units', function (\Illuminate\Database\Schema\Blueprint $table) {
+                    if (!\Illuminate\Support\Facades\Schema::hasColumn('units', 'certificate_logo')) {
+                        $table->string('certificate_logo')->nullable();
+                    }
+                    if (!\Illuminate\Support\Facades\Schema::hasColumn('units', 'certificate_seal_text')) {
+                        $table->string('certificate_seal_text')->nullable();
+                    }
+                    if (!\Illuminate\Support\Facades\Schema::hasColumn('units', 'certificate_president_name')) {
+                        $table->string('certificate_president_name')->nullable();
+                    }
+                    if (!\Illuminate\Support\Facades\Schema::hasColumn('units', 'certificate_secretary_name')) {
+                        $table->string('certificate_secretary_name')->nullable();
+                    }
+                    if (!\Illuminate\Support\Facades\Schema::hasColumn('units', 'signatory_1_name')) {
+                        $table->string('signatory_1_name')->nullable();
+                    }
+                    if (!\Illuminate\Support\Facades\Schema::hasColumn('units', 'signatory_1_title')) {
+                        $table->string('signatory_1_title')->nullable();
+                    }
+                    if (!\Illuminate\Support\Facades\Schema::hasColumn('units', 'signatory_1_signature')) {
+                        $table->string('signatory_1_signature')->nullable();
+                    }
+                    if (!\Illuminate\Support\Facades\Schema::hasColumn('units', 'signatory_2_name')) {
+                        $table->string('signatory_2_name')->nullable();
+                    }
+                    if (!\Illuminate\Support\Facades\Schema::hasColumn('units', 'signatory_2_title')) {
+                        $table->string('signatory_2_title')->nullable();
+                    }
+                    if (!\Illuminate\Support\Facades\Schema::hasColumn('units', 'signatory_2_signature')) {
+                        $table->string('signatory_2_signature')->nullable();
+                    }
+                    if (!\Illuminate\Support\Facades\Schema::hasColumn('units', 'signatory_3_name')) {
+                        $table->string('signatory_3_name')->nullable();
+                    }
+                    if (!\Illuminate\Support\Facades\Schema::hasColumn('units', 'signatory_3_title')) {
+                        $table->string('signatory_3_title')->nullable();
+                    }
+                    if (!\Illuminate\Support\Facades\Schema::hasColumn('units', 'signatory_3_signature')) {
+                        $table->string('signatory_3_signature')->nullable();
+                    }
+                });
+            } catch (\Throwable $ex) {
+                \Illuminate\Support\Facades\Log::error('Auto-migration for units certificate columns failed: ' . $ex->getMessage());
+            }
+        }
+    }
+
+    public function certificateSettings()
+    {
+        $this->ensureCertificateColumnsExist();
+        $unitId = $this->myUnitId();
+        $unit   = \App\Models\Unit::with('district.state')->findOrFail($unitId);
+
+        return view('unit-admin.certificate', compact('unit'));
+    }
+
+    public function updateCertificateSettings(Request $request)
+    {
+        $this->ensureCertificateColumnsExist();
+        $unitId = $this->myUnitId();
+        $unit   = \App\Models\Unit::findOrFail($unitId);
+
+        $request->validate([
+            'certificate_logo'      => 'nullable|image|mimes:jpeg,png,jpg,webp,svg|max:3072',
+            'certificate_seal_text' => 'nullable|string|max:100',
+            'signatory_1_name'      => 'nullable|string|max:100',
+            'signatory_1_title'     => 'nullable|string|max:100',
+            'signatory_1_signature' => 'nullable|image|mimes:jpeg,png,jpg,webp,svg|max:2048',
+            'signatory_2_name'      => 'nullable|string|max:100',
+            'signatory_2_title'     => 'nullable|string|max:100',
+            'signatory_2_signature' => 'nullable|image|mimes:jpeg,png,jpg,webp,svg|max:2048',
+            'signatory_3_name'      => 'nullable|string|max:100',
+            'signatory_3_title'     => 'nullable|string|max:100',
+            'signatory_3_signature' => 'nullable|image|mimes:jpeg,png,jpg,webp,svg|max:2048',
+        ]);
+
+        if ($request->hasFile('certificate_logo')) {
+            if ($unit->certificate_logo && Storage::disk('public')->exists($unit->certificate_logo)) {
+                Storage::disk('public')->delete($unit->certificate_logo);
+            }
+            $file = $request->file('certificate_logo');
+            $fileName = 'unit_' . $unit->id . '_cert_logo_' . time() . '.' . $file->getClientOriginalExtension();
+            $unit->certificate_logo = $file->storeAs('unit_logos', $fileName, 'public');
+        }
+
+        $unit->certificate_seal_text = $request->filled('certificate_seal_text') ? trim($request->certificate_seal_text) : null;
+
+        // Dynamic signatories 1, 2, 3
+        foreach ([1, 2, 3] as $i) {
+            $nameField  = "signatory_{$i}_name";
+            $titleField = "signatory_{$i}_title";
+            $sigField   = "signatory_{$i}_signature";
+            $removeSig  = "remove_signatory_{$i}_signature";
+
+            if ($request->hasFile($sigField)) {
+                if ($unit->$sigField && Storage::disk('public')->exists($unit->$sigField)) {
+                    Storage::disk('public')->delete($unit->$sigField);
+                }
+                $file = $request->file($sigField);
+                $fileName = 'unit_' . $unit->id . "_sig_{$i}_" . time() . '.' . $file->getClientOriginalExtension();
+                $unit->$sigField = $file->storeAs('unit_signatures', $fileName, 'public');
+            } elseif ($request->boolean($removeSig)) {
+                if ($unit->$sigField && Storage::disk('public')->exists($unit->$sigField)) {
+                    Storage::disk('public')->delete($unit->$sigField);
+                }
+                $unit->$sigField = null;
+            }
+
+            $unit->$nameField  = $request->filled($nameField) ? trim($request->$nameField) : null;
+            $unit->$titleField = $request->filled($titleField) ? trim($request->$titleField) : null;
+        }
+
+        // Backward compatibility
+        $unit->certificate_president_name = $unit->signatory_1_name;
+        $unit->certificate_secretary_name = $unit->signatory_2_name;
+        $unit->save();
+
+        return back()->with('success', 'Unit certificate settings and signatories updated successfully!');
+    }
+
+    public function removeCertificateLogo()
+    {
+        $unitId = $this->myUnitId();
+        $unit   = \App\Models\Unit::findOrFail($unitId);
+
+        if ($unit->certificate_logo && Storage::disk('public')->exists($unit->certificate_logo)) {
+            Storage::disk('public')->delete($unit->certificate_logo);
+        }
+
+        $unit->certificate_logo = null;
+        $unit->save();
+
+        return back()->with('success', 'Certificate logo removed. This unit will now use the default central logo.');
+    }
+
+    public function removeSignatorySignature($index)
+    {
+        $unitId = $this->myUnitId();
+        $unit   = \App\Models\Unit::findOrFail($unitId);
+        $index  = (int) $index;
+
+        if (in_array($index, [1, 2, 3])) {
+            $sigField = "signatory_{$index}_signature";
+            if ($unit->$sigField && Storage::disk('public')->exists($unit->$sigField)) {
+                Storage::disk('public')->delete($unit->$sigField);
+            }
+            $unit->$sigField = null;
+            $unit->save();
+        }
+
+        return back()->with('success', "Signatory {$index} signature removed. Reverted to default.");
+    }
+
+    public function previewCertificate()
+    {
+        $this->ensureCertificateColumnsExist();
+        $unitId = $this->myUnitId();
+        $unit   = \App\Models\Unit::with('district.state')->findOrFail($unitId);
+
+        $sampleProfile = MemberProfile::with('user')->where('unit_id', $unitId)->first();
+        if (!$sampleProfile) {
+            $sampleProfile = new MemberProfile();
+            $sampleProfile->membership_id = 'FuMMA/' . strtoupper(substr(preg_replace('/[^A-Za-z]/', '', $unit->name), 0, 3)) . '/001';
+            $sampleProfile->joined_date = now()->format('Y-m-d');
+            $sampleUser = new \App\Models\User();
+            $sampleUser->name = 'Sample Member Name';
+            $sampleProfile->setRelation('user', $sampleUser);
+            $sampleProfile->setRelation('unit', $unit);
+        }
+
+        $logoDataUrl = null;
+        if ($unit->certificate_logo && Storage::disk('public')->exists($unit->certificate_logo)) {
+            $realLogoPath = Storage::disk('public')->path($unit->certificate_logo);
+            $mime         = @mime_content_type($realLogoPath) ?: 'image/png';
+            $logoDataUrl  = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($realLogoPath));
+        } else {
+            $defaultLogoPath = public_path('fumma-logo.png');
+            if (file_exists($defaultLogoPath)) {
+                $logoDataUrl = 'data:image/png;base64,' . base64_encode(file_get_contents($defaultLogoPath));
+            }
+        }
+
+        try {
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('certificates.membership', [
+                'profile' => $sampleProfile,
+                'unit'    => $unit,
+                'logo'    => $logoDataUrl,
+            ])->setPaper('a4', 'landscape');
+
+            return $pdf->stream('sample_certificate_' . strtolower(preg_replace('/[^A-Za-z0-9]/', '_', $unit->name)) . '.pdf');
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Certificate preview failed: ' . $e->getMessage());
+            return back()->with('error', 'Unable to preview certificate: ' . $e->getMessage());
+        }
     }
 
     // ─────────────────────────────────

@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Fumma District Admin - Login</title>
+  <title>Member Net District Admin - Login</title>
   <link
     href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&display=swap"
     rel="stylesheet">
@@ -218,7 +218,7 @@
   <div class="wrap">
     <div class="brand">
       <div class="brand-icon">🎓</div>
-      <div class="brand-title">Fumma</div>
+      <div class="brand-title">Member Net</div>
       <div class="brand-sub">District Admin Panel</div>
     </div>
 

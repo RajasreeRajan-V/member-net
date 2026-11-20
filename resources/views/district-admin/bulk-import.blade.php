@@ -48,7 +48,7 @@
     <div class="tw">
       <table>
                 <thead>
-          <tr><th>Row</th><th>Name</th><th>Email</th><th>FUMMA</th><th>Status</th></tr>
+          <tr><th>Row</th><th>Name</th><th>Email</th><th>Member Net</th><th>Status</th></tr>
         </thead>
         <tbody>
           @foreach($results['success'] as $s)
@@ -58,9 +58,9 @@
             <td style="color:var(--text-dim)">{{ $s['email'] ?: '—' }}</td>
             <td>
               @if(!empty($s['is_fumma_member']))
-                <span class="badge bap">FUMMA</span>
+                <span class="badge bap">Member Net</span>
               @else
-                <span style="color:var(--text-dim);font-size:11px;">Non-FUMMA</span>
+                <span style="color:var(--text-dim);font-size:11px;">Non-Member Net</span>
               @endif
             </td>
             <td><span class="badge bap">Created</span></td>

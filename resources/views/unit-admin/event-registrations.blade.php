@@ -80,14 +80,14 @@
     </div>
   @else
     <div class="tw">
-      <table>
+      <table style="min-width: 780px;">
         <thead>
           <tr>
             <th>#</th>
             <th>Member</th>
-            <th class="hide-mobile">Phone</th>
-            <th class="hide-mobile">Unit</th>
-            <th class="hide-mobile">District</th>
+            <th>Phone</th>
+            <th>Unit</th>
+            <th>District</th>
             <th>Registered On</th>
             <th>Payment</th>
           </tr>
@@ -107,9 +107,9 @@
                 </div>
               </div>
             </td>
-            <td class="hide-mobile" style="color:var(--text-dim);">{{ $reg->user->phone ?? '—' }}</td>
-            <td class="hide-mobile">{{ $reg->memberProfile?->unit?->name ?? '—' }}</td>
-            <td class="hide-mobile" style="color:var(--text-dim);">{{ $reg->memberProfile?->district?->name ?? '—' }}</td>
+            <td style="color:var(--text-dim);">{{ $reg->user->phone ?? '—' }}</td>
+            <td>{{ $reg->memberProfile?->unit?->name ?? '—' }}</td>
+            <td style="color:var(--text-dim);">{{ $reg->memberProfile?->district?->name ?? '—' }}</td>
             <td style="color:var(--text-dim);">{{ $reg->created_at->format('d M Y') }}</td>
             <td>
               @if($event->ticket_type === 'FREE')

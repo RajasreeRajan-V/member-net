@@ -59,12 +59,13 @@
     </div>
     <div class="tw">
       <table>
-                <thead>
+        <thead>
           <tr>
             <th>Row</th>
             <th>Name</th>
             <th>Email</th>
-            <th>FUMMA</th>
+            <th>Membership ID</th>
+            <th>Member Net</th>
             <th>Status</th>
           </tr>
         </thead>
@@ -74,14 +75,15 @@
             <td style="color:var(--text-dim)">#{{ $s['row'] }}</td>
             <td>{{ $s['name'] }}</td>
             <td style="color:var(--text-dim)">{{ $s['email'] ?: '—' }}</td>
+            <td style="font-weight:600;color:var(--accent);">{{ $s['membership_id'] ?? '—' }}</td>
             <td>
               @if(!empty($s['is_fumma_member']))
-                <span class="badge bap">FUMMA</span>
+                <span class="badge bap">Member Net</span>
               @else
-                <span style="color:var(--text-dim);font-size:11px;">Non-FUMMA</span>
+                <span style="color:var(--text-dim);font-size:11px;">Non-Member Net</span>
               @endif
             </td>
-            <td><span class="badge bap">Created</span></td>
+            <td><span class="badge bap">Approved</span></td>
           </tr>
           @endforeach
         </tbody>
@@ -321,11 +323,10 @@
                   justify-content:space-between;
                   align-items:center;flex-wrap:wrap;gap:8px;">
         <div style="font-size:11px;color:var(--text-dim);">
-          <i class="fas fa-info-circle"
-             style="color:var(--accent)"></i>
-          All imported members will have
-          <b style="color:var(--orange)">PENDING</b> status.
-          Approve each member from the Members page.
+          <i class="fas fa-check-circle"
+             style="color:var(--green)"></i>
+          All imported members will be
+          <b style="color:var(--green)">AUTOMATICALLY APPROVED</b> with membership IDs generated.
         </div>
         <button type="submit" class="btn bp"
                 id="importBtn">

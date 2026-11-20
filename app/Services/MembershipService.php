@@ -28,21 +28,34 @@ class MembershipService
         });
     }
 
-    // Format: FuMMA/KAS/004 (serial per district code)
+    // Format: MemberNet/HOS/004 (serial per unit)
 private function nextMembershipId(MemberProfile $profile): string
 {
-    $districtCode = strtoupper(substr($profile->district->name ?? 'XXX', 0, 3));
+    $profile->loadMissing(['unit.district', 'district']);
 
-    $newPrefix  = 'FuMMA/' . $districtCode . '/';
-    $prevPrefix = 'FUMMA/' . $districtCode . '/';   // IDs already issued in the previous format
-    $oldPrefix  = 'FUMMA-' . $districtCode . '-';   // IDs issued in the oldest format
+    // Unit-based code (e.g. ALU for Aluva, HOS for Hosdurg)
+    $code = strtoupper(substr($profile->unit?->name ?? $profile->district?->name ?? 'MEM', 0, 3));
+
+    $newPrefix   = 'MemberNet/' . $code . '/';
+    $fummaPrefix = 'FuMMA/' . $code . '/';
+    $prevPrefix  = 'FUMMA/' . $code . '/';
+    $oldPrefix   = 'FUMMA-' . $code . '-';
+
+    $distCode = strtoupper(substr($profile->unit?->district?->name ?? $profile->district?->name ?? '', 0, 3));
 
     $maxSerial = MemberProfile::withTrashed()   // remove withTrashed() if no SoftDeletes
         ->whereNotNull('membership_id')
-        ->where(function ($q) use ($newPrefix, $prevPrefix, $oldPrefix) {
+        ->where(function ($q) use ($newPrefix, $fummaPrefix, $prevPrefix, $oldPrefix, $distCode, $code) {
             $q->where('membership_id', 'LIKE', $newPrefix . '%')
+              ->orWhere('membership_id', 'LIKE', $fummaPrefix . '%')
               ->orWhere('membership_id', 'LIKE', $prevPrefix . '%')
               ->orWhere('membership_id', 'LIKE', $oldPrefix . '%');
+
+            if ($distCode && $distCode !== $code) {
+                $q->orWhere('membership_id', 'LIKE', 'MemberNet/' . $distCode . '/%')
+                  ->orWhere('membership_id', 'LIKE', 'FuMMA/' . $distCode . '/%')
+                  ->orWhere('membership_id', 'LIKE', 'FUMMA/' . $distCode . '/%');
+            }
         })
         ->lockForUpdate()
         ->selectRaw("MAX(CAST(SUBSTRING_INDEX(REPLACE(membership_id, '/', '-'), '-', -1) AS UNSIGNED)) as max_serial")

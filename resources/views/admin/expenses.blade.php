@@ -42,7 +42,7 @@
       <div class="ct"><i class="fas fa-chart-pie"></i>Category Breakdown — {{ now()->format('F Y') }}</div>
     </div>
     <div class="tw">
-      <table>
+      <table style="min-width: 560px;">
         <thead>
           <tr><th>Category</th><th>Transactions</th><th>Total</th><th>% of Month</th></tr>
         </thead>
@@ -68,7 +68,7 @@
       <div class="ct"><i class="fas fa-table"></i>Monthly Report — {{ now()->format('Y') }}</div>
     </div>
     <div class="tw">
-      <table>
+      <table style="min-width: 500px;">
         <thead>
           <tr><th>Month</th><th>Transactions</th><th>Total</th></tr>
         </thead>
@@ -99,7 +99,7 @@
     </div>
 
     <div class="tw">
-      <table>
+      <table style="min-width: 840px;">
         <thead>
           <tr>
             <th>#</th>

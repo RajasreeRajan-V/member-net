@@ -12,48 +12,151 @@
     </a>
   </div>
 
+  @if(session('success'))
+    <div style="margin:12px 18px 0;padding:10px 14px;border-radius:8px;background:rgba(52,211,153,0.1);border:1px solid var(--green,#10b981);color:var(--green,#10b981);font-size:12px;">
+      <i class="fas fa-check-circle" style="margin-right:6px;"></i>{{ session('success') }}
+    </div>
+  @endif
+
   <div class="tw">
-    <table>
+    <table style="min-width: 850px;">
       <thead>
         <tr>
           <th>Member</th>
+          <th>Type</th>
           <th>Unit</th>
           <th>Month</th>
           <th>Amount</th>
           <th>Status</th>
-          <th>Paid Date</th>
+          <th>Payment Details</th>
+          <th>Actions</th>
         </tr>
       </thead>
       <tbody>
         @forelse ($dues as $due)
+          @php
+            $isTp = !empty($due->third_party_member_id);
+            $payerName = $isTp ? ($due->thirdPartyMember->name ?? '—') : ($due->memberProfile->user->name ?? '—');
+            $payerSubtitle = $isTp ? (($due->thirdPartyMember->phone ?? '') . ($due->thirdPartyMember->organization ? ' • ' . $due->thirdPartyMember->organization : '')) : ($due->memberProfile->user->email ?? $due->memberProfile->user->phone ?? '');
+            $payerUnit = $isTp ? ($due->thirdPartyMember->unit->name ?? '—') : ($due->memberProfile->unit->name ?? '—');
+          @endphp
           <tr>
             <td>
               <div class="mc2">
-                <div class="av2" style="background:rgba(79,142,247,0.2);display:flex;align-items:center;justify-content:center;color:var(--accent-2);font-weight:700;font-size:10px;">
-                  {{ strtoupper(substr($due->memberProfile->user->name ?? '—', 0, 2)) }}
+                <div class="av2" style="background:{{ $isTp ? 'rgba(245,158,11,0.2)' : 'rgba(79,142,247,0.2)' }};display:flex;align-items:center;justify-content:center;color:{{ $isTp ? '#F59E0B' : 'var(--accent-2)' }};font-weight:700;font-size:10px;">
+                  {{ strtoupper(substr($payerName, 0, 2)) }}
                 </div>
                 <div>
-                  <div class="mn">{{ $due->memberProfile->user->name ?? '—' }}</div>
-                  <div class="me">{{ $due->memberProfile->user->email ?? '' }}</div>
+                  <div class="mn" style="font-weight:600;{{ $isTp ? 'color:#F59E0B;' : '' }}">
+                    {{ $payerName }}
+                  </div>
+                  <div class="me">{{ $payerSubtitle }}</div>
                 </div>
               </div>
             </td>
-            <td><span class="utag">{{ $due->memberProfile->unit->name ?? '—' }}</span></td>
+            <td>
+              @if($isTp)
+                <span class="badge" style="background:rgba(245,158,11,0.15);color:#F59E0B;border:1px solid rgba(245,158,11,0.3);font-size:10px;padding:2px 8px;">Third-Party</span>
+              @else
+                <span class="badge" style="background:rgba(79,142,247,0.12);color:var(--accent);font-size:10px;padding:2px 8px;">Registered</span>
+              @endif
+            </td>
+            <td><span class="utag">{{ $payerUnit }}</span></td>
             <td>{{ $due->due_date->format('M Y') }}</td>
-            <td>₹{{ number_format($due->amount, 2) }}</td>
+            <td style="font-weight:600;">₹{{ number_format($due->amount, 2) }}</td>
             <td>
               <span class="badge {{ $due->status === 'PAID' ? 'bap' : ($due->status === 'OVERDUE' ? 'brj' : 'bpe') }}">
                 {{ $due->status }}
               </span>
             </td>
-            <td>{{ $due->paid_date?->format('d M Y') ?? '—' }}</td>
+            <td>
+              @if($due->status === 'PAID')
+                <div style="font-size:12px;font-weight:600;color:var(--green,#10b981);">
+                  <i class="fas fa-check" style="margin-right:4px;"></i>{{ $due->paid_date?->format('d M Y') }}
+                </div>
+                @if($due->payment_method)
+                  <div style="font-size:11px;color:var(--text-dim);">Method: {{ $due->payment_method }}</div>
+                @endif
+              @else
+                <span style="color:var(--text-dim);font-size:11px;">Unpaid</span>
+              @endif
+            </td>
+            <td>
+              @if($due->status !== 'PAID')
+                <button type="button" class="btn bp bsm" onclick="openRecordPaymentModal({{ $due->id }}, '{{ addslashes($payerName) }}', '{{ $due->due_date->format('M Y') }}', '{{ number_format($due->amount, 2) }}')" style="font-size:11px;padding:4px 8px;">
+                  <i class="fas fa-check-circle"></i> Mark Paid
+                </button>
+              @else
+                <span style="font-size:11px;color:var(--text-dim);"><i class="fas fa-lock" style="margin-right:4px;"></i>Settled</span>
+              @endif
+            </td>
           </tr>
         @empty
-          <tr><td colspan="6" style="text-align:center;color:var(--text-dim);white-space:normal;">No dues generated yet for this scheme.</td></tr>
+          <tr><td colspan="8" style="text-align:center;color:var(--text-dim);white-space:normal;padding:30px;">No dues generated yet for this scheme.</td></tr>
         @endforelse
       </tbody>
     </table>
   </div>
 </div>
 
+{{-- ══ RECORD PAYMENT MODAL ══ --}}
+<div class="mo" id="recordPaymentModal">
+  <div class="md" style="width:420px;max-width:96vw;">
+    <div class="mh">
+      <div class="mt2"><i class="fas fa-receipt" style="margin-right:6px;color:var(--accent);"></i>Record Scheme Payment</div>
+      <div class="mc3" onclick="cm('recordPaymentModal')"><i class="fas fa-times"></i></div>
+    </div>
+    <form action="{{ route('admin.schemes.payers.record-payment') }}" method="POST">
+      @csrf
+      <input type="hidden" name="due_id" id="pay_due_id">
+      <div style="padding:14px 18px 0;">
+        <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:14px;">
+          <div style="font-size:11px;color:var(--text-dim);">Member:</div>
+          <div id="pay_member_name" style="font-weight:700;font-size:14px;color:var(--text);margin-top:2px;">—</div>
+          <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:12px;">
+            <div>Due Month: <b id="pay_month">—</b></div>
+            <div>Amount: <b id="pay_amount" style="color:var(--accent);">₹0.00</b></div>
+          </div>
+        </div>
+      </div>
+      <div class="fgrid" style="padding:0 18px;">
+        <div class="fg s2">
+          <label>Payment Method <span style="color:var(--red)">*</span></label>
+          <select name="payment_method" required>
+            <option value="Cash">Cash</option>
+            <option value="UPI">UPI / GPay / PhonePe</option>
+            <option value="Bank Transfer">Bank Transfer / NEFT</option>
+            <option value="Cheque">Cheque</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="fg s2">
+          <label>Paid Date <span style="color:var(--red)">*</span></label>
+          <input type="date" name="paid_date" value="{{ date('Y-m-d') }}" required>
+        </div>
+        <div class="fg s2">
+          <label>Notes / Reference (optional)</label>
+          <input type="text" name="notes" placeholder="e.g. Receipt #1234 or UPI Ref">
+        </div>
+      </div>
+      <div class="ff">
+        <button type="button" class="btn bo" onclick="cm('recordPaymentModal')">Cancel</button>
+        <button type="submit" class="btn bp"><i class="fas fa-check"></i> Confirm Payment</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+@endsection
+
+@section('scripts')
+<script>
+function openRecordPaymentModal(dueId, memberName, month, amount) {
+  document.getElementById('pay_due_id').value = dueId;
+  document.getElementById('pay_member_name').textContent = memberName;
+  document.getElementById('pay_month').textContent = month;
+  document.getElementById('pay_amount').textContent = '₹' + amount;
+  om('recordPaymentModal');
+}
+</script>
 @endsection

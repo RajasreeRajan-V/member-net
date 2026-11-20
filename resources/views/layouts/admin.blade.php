@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="csrf-token" content="{{ csrf_token() }}">
-  <title>Fumma Admin - @yield('title')</title>
+  <title>Member Net Admin - @yield('title')</title>
   <link
     href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&display=swap"
     rel="stylesheet">
@@ -360,6 +360,7 @@
     .content {
       padding: 22px 26px;
       flex: 1;
+      min-width: 0;
     }
 
     /* ── CARD ── */
@@ -369,6 +370,8 @@
       border-radius: 11px;
       overflow: hidden;
       margin-bottom: 18px;
+      width: 100%;
+      max-width: 100%;
     }
 
     .ch {
@@ -458,14 +461,46 @@
       font-size: 10.5px;
     }
 
-    /* ── TABLE ── */
+    /* ── TABLE WRAPPER & SMOOTH HORIZONTAL SCROLLBAR ── */
     .tw {
-      overflow-x: auto;
+      width: 100%;
+      max-width: 100%;
+      overflow-x: auto !important;
       -webkit-overflow-scrolling: touch;
+      overscroll-behavior-x: contain;
+      position: relative;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(79, 142, 247, 0.45) rgba(15, 23, 41, 0.04);
+    }
+
+    .tw::-webkit-scrollbar {
+      height: 7px;
+    }
+
+    .tw::-webkit-scrollbar-track {
+      background: rgba(15, 23, 41, 0.04);
+      border-radius: 4px;
+      margin: 0 4px;
+    }
+
+    .tw::-webkit-scrollbar-thumb {
+      background: rgba(79, 142, 247, 0.45);
+      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .tw::-webkit-scrollbar-thumb:hover {
+      background: var(--accent);
     }
 
     table {
       width: 100%;
+      border-collapse: collapse;
+    }
+
+    .tw table {
+      width: 100%;
+      min-width: 720px;
       border-collapse: collapse;
     }
 
@@ -1018,7 +1053,7 @@
     <div class="sl">
       <div class="sl-row">
         <div class="sl-icon">🎓</div>
-        <span class="sl-text">Fumma</span>
+        <span class="sl-text">Member Net</span>
       </div>
       <div class="sl-sub">Education Consultancy Association</div>
     </div>
@@ -1044,6 +1079,10 @@
       <a class="ni {{ request()->routeIs('admin.members*') ? 'active' : '' }}" href="{{ route('admin.members') }}"
         onclick="closeSidebar()">
         <i class="fas fa-users"></i>Members
+      </a>
+      <a class="ni {{ request()->routeIs('admin.non-members*') ? 'active' : '' }}" href="{{ route('admin.non-members') }}"
+        onclick="closeSidebar()">
+        <i class="fas fa-user-tag"></i>Non-Members
       </a>
       <a class="ni {{ request()->routeIs('admin.bulk-import*') ? 'active' : '' }}"
         href="{{ route('admin.bulk-import') }}" onclick="closeSidebar()">

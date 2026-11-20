@@ -55,14 +55,14 @@
 <div class="wrap">
 
   <div class="header">
-    <h1>🎓 Fumma</h1>
+    <h1>🎓 Member Net</h1>
     <div class="badge">📋 Registration Received</div>
   </div>
 
   <div class="body">
     <p>Hi <b>{{ $memberName }}</b>,</p>
     <p>
-      Your Fumma membership registration for <b>{{ $unitName }}</b> unit
+      Your Member Net membership registration for <b>{{ $unitName }}</b> unit
       has been received. Here are your login credentials — keep them safe.
     </p>
 
@@ -129,7 +129,7 @@
   </div>
 
   <div class="footer">
-    &copy; {{ date('Y') }} Fumma — Consultancy Association<br>
+    &copy; {{ date('Y') }} Member Net — Consultancy Association<br>
     This is an automated email. Please do not reply directly.
   </div>
 

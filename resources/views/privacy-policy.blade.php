@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Privacy Policy - FUMMA Connect</title>
+<title>Privacy Policy - Member Net Connect</title>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 <style>
@@ -69,13 +69,13 @@
   <div class="box">
     <div class="logo">
       
-      <div class="logo-text">FUMMA Connect</div>
+      <div class="logo-text">Member Net Connect</div>
       <div class="logo-sub">Association Management</div>
     </div>
 
     <div class="title">Privacy Policy</div>
 
-    <p class="intro">Astraz Software Solutions LLP built the FUMMA Connect app (Association Management) as a Free app. This SERVICE is provided by Astraz Software Solutions LLP at no cost and is intended for use as is.</p>
+    <p class="intro">Astraz Software Solutions LLP built the Member Net Connect app (Association Management) as a Free app. This SERVICE is provided by Astraz Software Solutions LLP at no cost and is intended for use as is.</p>
     <p class="intro">This page informs visitors about our policies regarding the collection, use, and disclosure of Personal Information for those who choose to use our Service. If you choose to use our Service, you agree to the collection and use of information in accordance with this policy. The Personal Information we collect is used to provide and improve the Service. We will not use or share your information except as described in this Privacy Policy.</p>
 
     <h2><i class="fas fa-database"></i>1. Information We Collect</h2>
@@ -105,7 +105,7 @@
     <h2><i class="fas fa-share-nodes"></i>4. Sharing of Information</h2>
     <p>We do not sell or share your personal information with third parties for marketing purposes. However, we may share your information:</p>
     <ul>
-      <li>With authorized FUMMA Connect officials (Super Admins, District Admins, and Unit Admins) for service and record-keeping purposes.</li>
+      <li>With authorized Member Net Connect officials (Super Admins, District Admins, and Unit Admins) for service and record-keeping purposes.</li>
     </ul>
 
     <h2><i class="fas fa-lock"></i>5. Data Security</h2>

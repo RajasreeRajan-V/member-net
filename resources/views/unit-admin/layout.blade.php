@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Fumma Unit Admin - @yield('title')</title>
+  <title>Member Net Unit Admin - @yield('title')</title>
   <link
     href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&display=swap"
     rel="stylesheet">
@@ -211,10 +211,10 @@
     .tbb-logout { color: var(--red); border-color: rgba(248,113,113,0.3); background: rgba(248,113,113,0.08); }
     .tbb-logout:hover { background: rgba(248,113,113,0.2); color: var(--red); }
 
-    .content { padding: 22px 26px; flex: 1; }
+    .content { padding: 22px 26px; flex: 1; min-width: 0; }
 
     /* ── CARD ── */
-    .card { background: var(--card); border: 1px solid var(--border); border-radius: 11px; overflow: hidden; margin-bottom: 18px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 11px; overflow: hidden; margin-bottom: 18px; width: 100%; max-width: 100%; }
     .ch { padding: 13px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
     .ct { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
     .ct i { color: var(--accent); font-size: 11px; }
@@ -239,9 +239,40 @@
     .bsuc { background: rgba(52,211,153,0.15); color: var(--green); border: 1px solid rgba(52,211,153,0.3); }
     .bsuc:hover { background: rgba(52,211,153,0.25); }
 
-    /* ── TABLE ── */
-    .tw { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    /* ── TABLE WRAPPER & SMOOTH HORIZONTAL SCROLLBAR ── */
+    .tw {
+      width: 100%;
+      max-width: 100%;
+      overflow-x: auto !important;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-x: contain;
+      position: relative;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(79, 142, 247, 0.45) rgba(15, 23, 41, 0.04);
+    }
+
+    .tw::-webkit-scrollbar {
+      height: 7px;
+    }
+
+    .tw::-webkit-scrollbar-track {
+      background: rgba(15, 23, 41, 0.04);
+      border-radius: 4px;
+      margin: 0 4px;
+    }
+
+    .tw::-webkit-scrollbar-thumb {
+      background: rgba(79, 142, 247, 0.45);
+      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .tw::-webkit-scrollbar-thumb:hover {
+      background: var(--accent);
+    }
+
     table { width: 100%; border-collapse: collapse; }
+    .tw table { width: 100%; min-width: 720px; border-collapse: collapse; }
     thead th { padding: 9px 13px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-dim); background: rgba(255,255,255,0.02); text-align: left; white-space: nowrap; }
     tbody td { padding: 11px 13px; font-size: 12px; color: var(--text); border-top: 1px solid var(--border); vertical-align: middle; white-space: nowrap; }
     tbody tr:hover td { background: var(--card-hover); }
@@ -375,7 +406,7 @@
     <div class="sl">
       <div class="sl-row">
         <div class="sl-icon">🎓</div>
-        <span class="sl-text">Fumma</span>
+        <span class="sl-text">Member Net</span>
       </div>
       <div class="sl-sub">Unit Admin Panel</div>
     </div>
@@ -397,6 +428,10 @@
       <a class="ni {{ request()->routeIs('unit-admin.members*') ? 'active' : '' }}"
          href="{{ route('unit-admin.members') }}" onclick="closeSidebar()">
         <i class="fas fa-users"></i>Members
+      </a>
+      <a class="ni {{ request()->routeIs('unit-admin.non-members*') ? 'active' : '' }}"
+         href="{{ route('unit-admin.non-members') }}" onclick="closeSidebar()">
+        <i class="fas fa-user-tag"></i>Non-Members
       </a>
       <a class="ni {{ request()->routeIs('unit-admin.bulk-import*') ? 'active' : '' }}"
          href="{{ route('unit-admin.bulk-import') }}" onclick="closeSidebar()">
@@ -453,6 +488,12 @@
       <a class="ni {{ request()->routeIs('unit-admin.renewals-manage*') ? 'active' : '' }}"
          href="{{ route('unit-admin.renewals-manage') }}" onclick="closeSidebar()">
         <i class="fas fa-sync-alt"></i>Renewals
+      </a>
+
+      <div class="ns">Branding & Certificate</div>
+      <a class="ni {{ request()->routeIs('unit-admin.certificate*') ? 'active' : '' }}"
+         href="{{ route('unit-admin.certificate') }}" onclick="closeSidebar()">
+        <i class="fas fa-certificate"></i>Certificate Settings
       </a>
       {{-- Payments (commented out) --}}
       {{-- <a class="ni {{ request()->routeIs('unit-admin.payments*') ? 'active' : '' }}"

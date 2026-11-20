@@ -66,13 +66,13 @@
   {{-- ── HEADER ── --}}
   @if($status === 'approved')
     <div class="header-approved">
-      <h1>🎓 Fumma</h1>
+      <h1>🎓 Member Net</h1>
       <p>Education Consultancy Association</p>
       <div class="badge">✅ Membership Approved</div>
     </div>
   @else
     <div class="header-rejected">
-      <h1>🎓 MemberNet</h1>
+      <h1>🎓 Member Net</h1>
       <p>Education Consultancy Association</p>
       <div class="badge">❌ Application Update</div>
     </div>
@@ -89,7 +89,7 @@
 
       <p>Dear <b>{{ $memberName }}</b>,</p>
       <p>
-        Your Fumma membership application for <b>{{ $unitName }}</b> unit
+        Your Member Net membership application for <b>{{ $unitName }}</b> unit
         has been reviewed and approved by your Unit Admin.
       </p>
 
@@ -101,7 +101,7 @@
             <span class="step-num">1</span>
           </td>
           <td class="step-text">
-            Log in to the Fumma app using your registered email and password.
+            Log in to the Member Net app using your registered email and password.
           </td>
         </tr>
       </table>
@@ -134,7 +134,7 @@
 
       <p>Dear <b>{{ $memberName }}</b>,</p>
       <p>
-        Thank you for applying for Fumma membership under
+        Thank you for applying for Member Net membership under
         <b>{{ $unitName }}</b> unit. After review, your application
         has not been approved at this time.
       </p>
@@ -168,7 +168,7 @@
   </div>
 
   <div class="footer">
-    &copy; {{ date('Y') }} Fumma — Consultancy Association
+    &copy; {{ date('Y') }} Member Net
   </div>
 
 </div>

@@ -17,6 +17,22 @@ class AuthController extends Controller
     // ─────────────────────────────────
     public function login(Request $request)
     {
+        if ($request->isMethod('GET')) {
+            return response()->json([
+                'status'      => '0',
+                'status_code' => '405',
+                'message'     => 'The /api/login endpoint requires a POST request with "email" and "password".',
+                'data'        => [
+                    'method'   => 'POST',
+                    'endpoint' => url('/api/login'),
+                    'payload'  => [
+                        'email'    => 'user@example.com',
+                        'password' => 'your_password',
+                    ],
+                ],
+            ], 405);
+        }
+
         $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
             'email'    => 'required|email',
             'password' => 'required',
@@ -97,8 +113,6 @@ class AuthController extends Controller
                         'photo'           => $profile->photo ? asset('storage/' . $profile->photo) : null,
                         'unit_id'         => (string) $profile->unit_id,
                         'unit_name'       => $profile->unit->name ?? null,
-                        'district_id'     => (string) $profile->district_id,
-                        'district_name'   => $profile->district->name ?? null,
                         'state_id'        => (string) $profile->state_id,
                         'state_name'      => $profile->state->name ?? null,
                         'approval_status' => 'approved',
@@ -198,10 +212,8 @@ class AuthController extends Controller
                     'token'         => $token,
                     'unit_id'       => (string) $unitAdmin->unit_id,
                     'unit_name'     => $unitAdmin->unit->name ?? null,
-                    'district_id'   => (string) ($unitAdmin->unit->district_id ?? ''),
-                    'district_name' => $unitAdmin->unit->district->name ?? null,
-                    'state_id'      => (string) ($unitAdmin->unit->district->state_id ?? ''),
-                    'state_name'    => $unitAdmin->unit->district->state->name ?? null,
+                    'state_id'      => (string) ($unitAdmin->unit->district->state_id ?? \App\Models\State::fixed()?->id ?? '1'),
+                    'state_name'    => $unitAdmin->unit->district->state->name ?? \App\Models\State::fixed()?->name ?? 'Kerala',
                 ]
             ], 200);
         }
@@ -217,6 +229,22 @@ class AuthController extends Controller
 // ─────────────────────────────────
 public function loginV2(Request $request)
 {
+    if ($request->isMethod('GET')) {
+        return response()->json([
+            'status'      => '0',
+            'status_code' => '405',
+            'message'     => 'The /api/v2/login endpoint requires a POST request with "username" and "password".',
+            'data'        => [
+                'method'   => 'POST',
+                'endpoint' => url('/api/v2/login'),
+                'payload'  => [
+                    'username' => 'MemberNet/XXX/001 (or phone/email)',
+                    'password' => 'your_password (phone number for members)',
+                ],
+            ],
+        ], 405);
+    }
+
     $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
         'username' => 'required|string',
         'password' => 'required|string',
@@ -302,8 +330,6 @@ public function loginV2(Request $request)
             'photo'           => $profile->photo ? asset('storage/' . $profile->photo) : null,
             'unit_id'         => (string) $profile->unit_id,
             'unit_name'       => $profile->unit->name ?? null,
-            'district_id'     => (string) $profile->district_id,
-            'district_name'   => $profile->district->name ?? null,
             'state_id'        => (string) $profile->state_id,
             'state_name'      => $profile->state->name ?? null,
             'approval_status' => 'approved',
@@ -370,10 +396,8 @@ public function loginV2(Request $request)
             'token'         => $token,
             'unit_id'       => (string) $unitAdmin->unit_id,
             'unit_name'     => $unitAdmin->unit->name ?? null,
-            'district_id'   => (string) ($unitAdmin->unit->district_id ?? ''),
-            'district_name' => $unitAdmin->unit->district->name ?? null,
-            'state_id'      => (string) ($unitAdmin->unit->district->state_id ?? ''),
-            'state_name'    => $unitAdmin->unit->district->state->name ?? null,
+            'state_id'      => (string) ($unitAdmin->unit->district->state_id ?? \App\Models\State::fixed()?->id ?? '1'),
+            'state_name'    => $unitAdmin->unit->district->state->name ?? \App\Models\State::fixed()?->name ?? 'Kerala',
         ]);
     }
 

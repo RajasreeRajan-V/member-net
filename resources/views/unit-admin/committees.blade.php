@@ -13,7 +13,7 @@
   </div>
 
   <div class="tw">
-    <table>
+    <table style="min-width: 700px;">
       <thead>
         <tr>
           <th>Name</th>

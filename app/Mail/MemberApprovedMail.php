@@ -32,7 +32,7 @@ class MemberApprovedMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: '🎉 Your Fumma Membership has been Approved!',
+            subject: '🎉 Your Member Net Membership has been Approved!',
         );
     }
 

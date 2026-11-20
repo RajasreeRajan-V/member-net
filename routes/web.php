@@ -25,6 +25,38 @@ Route::get('/test-mail', function () {
     return 'Mail Sent';
 });
 
+Route::get('/run-certificate-migrations', function () {
+    try {
+        \Illuminate\Support\Facades\Schema::table('units', function (\Illuminate\Database\Schema\Blueprint $table) {
+            $cols = [
+                'certificate_logo',
+                'certificate_seal_text',
+                'certificate_president_name',
+                'certificate_secretary_name',
+                'signatory_1_name',
+                'signatory_1_title',
+                'signatory_1_signature',
+                'signatory_2_name',
+                'signatory_2_title',
+                'signatory_2_signature',
+                'signatory_3_name',
+                'signatory_3_title',
+                'signatory_3_signature',
+            ];
+            foreach ($cols as $col) {
+                if (!\Illuminate\Support\Facades\Schema::hasColumn('units', $col)) {
+                    $table->string($col)->nullable();
+                }
+            }
+        });
+        return response("SUCCESS: All certificate and signatory columns exist in 'units' table!", 200)
+            ->header('Content-Type', 'text/plain');
+    } catch (\Throwable $e) {
+        return response('ERROR: ' . $e->getMessage(), 500)
+            ->header('Content-Type', 'text/plain');
+    }
+});
+
 Route::get('/privacy-policy', function () {
     return view('privacy-policy');
 })->name('privacy-policy');
@@ -48,6 +80,19 @@ Route::post('/admin/login', [LoginController::class, 'login'])->name('admin.logi
 // ─────────────────────────────────
 Route::get('/unit-admin/login', [UnitAdminLoginController::class, 'showLogin'])->name('unit-admin.login');
 Route::post('/unit-admin/login', [UnitAdminLoginController::class, 'login'])->name('unit-admin.login.post');
+
+// Convenient aliases for Unit Admin login
+Route::get('/admin/unit-admin/login', function () {
+    return redirect()->route('unit-admin.login');
+});
+Route::post('/admin/unit-admin/login', [UnitAdminLoginController::class, 'login']);
+
+Route::get('/unit-admin', function () {
+    return redirect()->route('unit-admin.login');
+});
+Route::get('/admin/unit-admin', function () {
+    return redirect()->route('unit-admin.login');
+});
 
 
 Route::get('/district-admin/login', [DistrictAdminLoginController::class, 'showLogin'])->name('district-admin.login');
@@ -108,6 +153,10 @@ Route::prefix('admin')
         Route::post('/units', [AdminController::class, 'storeUnit'])->name('units.store');
         Route::put('/units', [AdminController::class, 'updateUnit'])->name('units.update');
         Route::delete('/units', [AdminController::class, 'deleteUnit'])->name('units.delete');
+        Route::post('/units/{id}/certificate', [AdminController::class, 'updateUnitCertificate'])->name('units.certificate.update');
+        Route::delete('/units/{id}/certificate/logo', [AdminController::class, 'removeUnitCertificateLogo'])->name('units.certificate.remove-logo');
+        Route::delete('/units/{id}/certificate/signature/{index}', [AdminController::class, 'removeUnitSignatorySignature'])->name('units.certificate.remove-signature');
+        Route::get('/units/{id}/certificate/preview', [AdminController::class, 'previewUnitCertificate'])->name('units.certificate.preview');
 
         Route::get('/unit-admins', [AdminController::class, 'unitAdmins'])->name('unit-admins');
         Route::post('/unit-admins', [AdminController::class, 'storeUnitAdmin'])->name('unit-admins.store');
@@ -125,12 +174,21 @@ Route::post('/district-admins/toggle-status', [AdminController::class, 'toggleDi
 Route::delete('/district-admins', [AdminController::class, 'deleteDistrictAdmin'])->name('district-admins.delete');
 
         Route::get('/members', [AdminController::class, 'members'])->name('members');
+        Route::get('/members/download-all', [AdminController::class, 'downloadMembers'])->name('members.download-all');
         Route::post('/members', [AdminController::class, 'storeMember'])->name('members.store');
         Route::get('/members/{id}/detail', [AdminController::class, 'memberDetail'])->name('members.detail');
+        Route::get('/members/{id}/download', [AdminController::class, 'downloadMemberDetail'])->name('members.download');
         Route::post('/members/update', [AdminController::class, 'updateMember'])->name('members.update');
         Route::delete('/members', [AdminController::class, 'deleteMember'])->name('members.delete');
         Route::post('/members/approve', [AdminController::class, 'approveMember'])->name('members.approve');
         Route::post('/members/reject', [AdminController::class, 'rejectMember'])->name('members.reject');
+
+        // ── NON-MEMBERS (Third-Party) ──
+        Route::get('/non-members',             [AdminController::class, 'nonMembers'])->name('non-members');
+        Route::post('/non-members',            [AdminController::class, 'storeNonMember'])->name('non-members.store');
+        Route::post('/non-members/update',     [AdminController::class, 'updateNonMember'])->name('non-members.update');
+        Route::delete('/non-members',          [AdminController::class, 'deleteNonMember'])->name('non-members.delete');
+        Route::get('/non-members/{id}/detail', [AdminController::class, 'nonMemberDetail'])->name('non-members.detail');
 
         Route::get('/news', [AdminController::class, 'news'])->name('news');
         Route::post('/news', [AdminController::class, 'storeNews'])->name('news.store');
@@ -173,6 +231,8 @@ Route::post('/schemes/toggle-status', [AdminController::class, 'toggleSchemeStat
 Route::post('/schemes/delete',        [AdminController::class, 'deleteScheme'])->name('schemes.delete');
 Route::get('/schemes/{id}/detail',    [AdminController::class, 'schemeDetail'])->name('schemes.detail');
 Route::get('/schemes/{id}/payers',    [AdminController::class, 'schemePayers'])->name('schemes.payers');
+Route::post('/schemes/third-party-member',     [AdminController::class, 'storeThirdPartyMember'])->name('schemes.third-party-member');
+Route::post('/schemes/payers/record-payment',  [AdminController::class, 'recordSchemeDuePayment'])->name('schemes.payers.record-payment');
 
 
 Route::get('/committees',                     [AdminController::class, 'committees'])->name('committees');
@@ -362,12 +422,21 @@ Route::prefix('unit-admin')
         Route::get('/dashboard', [UnitAdminController::class, 'dashboard'])->name('dashboard');
 
         Route::get('/members', [UnitAdminController::class, 'members'])->name('members');
+        Route::get('/members/download-all', [UnitAdminController::class, 'downloadMembers'])->name('members.download-all');
         Route::post('/members', [UnitAdminController::class, 'storeMember'])->name('members.store');
         Route::get('/members/{id}/detail', [UnitAdminController::class, 'memberDetail'])->name('members.detail');
+        Route::get('/members/{id}/download', [UnitAdminController::class, 'downloadMemberDetail'])->name('members.download');
         Route::post('/members/approve', [UnitAdminController::class, 'approveMember'])->name('members.approve');
         Route::post('/members/reject', [UnitAdminController::class, 'rejectMember'])->name('members.reject');
         Route::post('/members/import-csv', [UnitAdminController::class, 'importMembersCsv'])->name('members.import-csv');
         Route::get('/members/csv-template', [UnitAdminController::class, 'downloadCsvTemplate'])->name('members.csv-template');
+
+        // ── NON-MEMBERS (Third-Party) ──
+        Route::get('/non-members',             [UnitAdminController::class, 'nonMembers'])->name('non-members');
+        Route::post('/non-members',            [UnitAdminController::class, 'storeNonMember'])->name('non-members.store');
+        Route::post('/non-members/update',     [UnitAdminController::class, 'updateNonMember'])->name('non-members.update');
+        Route::delete('/non-members',          [UnitAdminController::class, 'deleteNonMember'])->name('non-members.delete');
+        Route::get('/non-members/{id}/detail', [UnitAdminController::class, 'nonMemberDetail'])->name('non-members.detail');
 
         // ── NEWS (unit admin can create/manage) ──
         Route::get('/news', [UnitAdminController::class, 'news'])->name('news');
@@ -451,6 +520,8 @@ Route::get('/schemes/{id}/detail', [UnitAdminController::class, 'schemeDetail'])
 Route::put('/schemes/toggle', [UnitAdminController::class, 'toggleSchemeStatus'])->name('schemes.toggle');
 Route::delete('/schemes/delete', [UnitAdminController::class, 'deleteScheme'])->name('schemes.delete');
 Route::get('/schemes/{id}/payers', [UnitAdminController::class, 'schemePayers'])->name('schemes.payers');
+Route::post('/schemes/third-party-member',    [UnitAdminController::class, 'storeThirdPartyMember'])->name('schemes.third-party-member');
+Route::post('/schemes/payers/record-payment', [UnitAdminController::class, 'recordSchemeDuePayment'])->name('schemes.payers.record-payment');
 
 Route::get('/renewals-manage',              [UnitAdminRenewalController::class, 'index'])->name('renewals-manage');
 Route::post('/renewals-manage',             [UnitAdminRenewalController::class, 'store'])->name('renewals-manage.store');
@@ -470,6 +541,13 @@ Route::delete('/expenses/delete',[UnitAdminController::class, 'deleteExpense'])-
 Route::get('/expenses/{id}/detail', [UnitAdminController::class, 'expenseDetail'])->name('expenses.detail');
 
 Route::delete('/members/delete', [UnitAdminController::class, 'deleteMember'])->name('members.delete');
+
+        // ── UNIT CERTIFICATE SETTINGS ──
+        Route::get('/certificate', [UnitAdminController::class, 'certificateSettings'])->name('certificate');
+        Route::post('/certificate', [UnitAdminController::class, 'updateCertificateSettings'])->name('certificate.update');
+        Route::delete('/certificate/logo', [UnitAdminController::class, 'removeCertificateLogo'])->name('certificate.remove-logo');
+        Route::delete('/certificate/signature/{index}', [UnitAdminController::class, 'removeSignatorySignature'])->name('certificate.remove-signature');
+        Route::get('/certificate/preview', [UnitAdminController::class, 'previewCertificate'])->name('certificate.preview');
         
         
     });

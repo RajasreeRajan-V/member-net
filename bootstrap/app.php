@@ -14,6 +14,12 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustProxies(at: '*');
+        $middleware->validateCsrfTokens(except: [
+            'unit-admin/login',
+            'admin/login',
+            'district-admin/login',
+            'admin/unit-admin/login',
+        ]);
         $middleware->alias([
             'super_admin'    => \App\Http\Middleware\SuperAdminMiddleware::class,
             'unit_admin'     => \App\Http\Middleware\UnitAdminMiddleware::class,
@@ -21,6 +27,18 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
+
+        $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException $e, $request) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                $allowed = implode(', ', $e->getHeaders()['Allow'] ?? ['POST']);
+                return response()->json([
+                    'status'      => '0',
+                    'status_code' => '405',
+                    'message'     => "The {$request->method()} method is not supported for this endpoint. Supported methods: {$allowed}.",
+                    'data'        => (object) [],
+                ], 405);
+            }
+        });
 
         $exceptions->render(function (AuthenticationException $e, $request) {
             // API / JSON

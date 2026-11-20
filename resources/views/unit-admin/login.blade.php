@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Fumma Unit Admin Login</title>
+  <title>Member Net Unit Admin Login</title>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
   <style>
@@ -108,7 +108,7 @@
   <div class="box">
     <div class="logo">
       <div class="logo-icon">🎓</div>
-      <div class="logo-text">Fumma</div>
+      <div class="logo-text">Member Net</div>
       <div class="logo-sub">Education Consultancy Association</div>
     </div>
 
@@ -127,13 +127,13 @@
     <form method="POST" action="{{ route('unit-admin.login.post') }}">
       @csrf
       <div class="fg">
-        <label>Email Address or Phone</label>
-        <input type="text" name="email" value="{{ old('email') }}" placeholder="admin@eca.com or 10-digit mobile" required autofocus>
+        <label>Username (6-Digit Unit ID)</label>
+        <input type="text" name="email" value="{{ old('email') }}" placeholder="Enter 6-digit Unit ID (e.g. 000063)" required autofocus>
       </div>
       <div class="fg">
-  <label>Password</label>
+  <label>Password (Phone Number)</label>
   <div style="position:relative;">
-    <input type="password" id="password" name="password" placeholder="Enter password" required>
+    <input type="password" id="password" name="password" placeholder="Enter 10-digit phone number" required>
 
     <i class="fas fa-eye"
        onclick="togglePassword(this)"

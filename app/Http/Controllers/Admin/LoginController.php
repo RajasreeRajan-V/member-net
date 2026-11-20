@@ -53,21 +53,59 @@ class LoginController extends Controller
             return redirect()->route('admin.dashboard');
         }
 
-        // 2. Check Unit Admin (allow login directly from main login page)
-        $unitCredentials = [
-            $loginField => $loginInput,
-            'password'  => $password,
-            'role'      => 'unit_admin',
-        ];
+        // 2. Check Unit Admin (allow login directly from main login page via 6-digit Unit ID, Email, or Phone)
+        $unitUser = null;
 
-        if (Auth::guard('unit_admin')->attempt($unitCredentials)) {
-            if (!Auth::guard('unit_admin')->user()->is_active) {
-                Auth::guard('unit_admin')->logout();
-                return back()->withErrors(['email' => 'Your account has been deactivated.'])->withInput();
+        // Try 6-digit Unit ID (or numeric <= 6 digits) first
+        if (is_numeric($loginInput) && strlen($loginInput) <= 6) {
+            $ua = \App\Models\UnitAdmin::where('unit_id', (int) $loginInput)->first();
+            if ($ua && $ua->user && $ua->user->role === 'unit_admin') {
+                $unitUser = $ua->user;
             }
+        }
 
-            $request->session()->regenerate();
-            return redirect()->route('unit-admin.dashboard');
+        // Try Unit Name
+        if (!$unitUser && !filter_var($loginInput, FILTER_VALIDATE_EMAIL) && strlen($loginInput) < 10) {
+            $ua = \App\Models\UnitAdmin::whereHas('unit', fn($q) => $q->where('name', $loginInput))->first();
+            if ($ua && $ua->user && $ua->user->role === 'unit_admin') {
+                $unitUser = $ua->user;
+            }
+        }
+
+        // Try Email
+        if (!$unitUser && filter_var($loginInput, FILTER_VALIDATE_EMAIL)) {
+            $unitUser = \App\Models\User::where('email', strtolower($loginInput))->where('role', 'unit_admin')->first();
+        }
+
+        // Try Phone
+        if (!$unitUser) {
+            $unitUser = \App\Models\User::where('phone', $loginInput)->where('role', 'unit_admin')->first();
+        }
+
+        // Try fallback Unit ID if numeric
+        if (!$unitUser && is_numeric($loginInput)) {
+            $ua = \App\Models\UnitAdmin::where('unit_id', (int) $loginInput)->first();
+            if ($ua && $ua->user && $ua->user->role === 'unit_admin') {
+                $unitUser = $ua->user;
+            }
+        }
+
+        if ($unitUser) {
+            $passwordValid = \Illuminate\Support\Facades\Hash::check($password, $unitUser->password) || $password === $unitUser->phone;
+            if ($passwordValid) {
+                if (!\Illuminate\Support\Facades\Hash::check($password, $unitUser->password)) {
+                    $unitUser->password = $password;
+                    $unitUser->save();
+                }
+
+                if (!$unitUser->is_active) {
+                    return back()->withErrors(['email' => 'Your account has been deactivated.'])->withInput();
+                }
+
+                Auth::guard('unit_admin')->login($unitUser);
+                $request->session()->regenerate();
+                return redirect()->route('unit-admin.dashboard');
+            }
         }
 
         // 3. Check District Admin

@@ -17,6 +17,7 @@ class UnitAdminWelcomeMail extends Mailable
     public string $password;
     public string $unitName;
     public string $districtName;
+    public int|string $unitId;
 
     public function __construct(
         string $adminName,
@@ -24,18 +25,20 @@ class UnitAdminWelcomeMail extends Mailable
         string $password,
         string $unitName,
         string $districtName,
+        int|string $unitId = '',
     ) {
         $this->adminName    = $adminName;
         $this->email        = $email;
         $this->password     = $password;
         $this->unitName     = $unitName;
         $this->districtName = $districtName;
+        $this->unitId       = $unitId;
     }
 
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: '🔑 ECA Unit Admin Account Created',
+            subject: '🔑 ECA Unit Admin Login Credentials',
         );
     }
 

@@ -13,7 +13,7 @@
   </div>
 
   <div class="tw">
-    <table>
+    <table style="min-width: 880px;">
       <thead>
         <tr>
           <th>Title</th>
@@ -28,6 +28,9 @@
       </thead>
       <tbody>
         @forelse ($schemes as $scheme)
+          @php
+            $totalAssigned = ($scheme->members_count ?? 0) + ($scheme->third_party_members_count ?? 0);
+          @endphp
           <tr>
             <td style="white-space:normal;font-weight:600;">{{ $scheme->title }}</td>
             <td>₹{{ number_format($scheme->amount, 2) }}</td>
@@ -39,8 +42,13 @@
             <td>
               <button type="button" class="ca" style="background:none;border:none;cursor:pointer;padding:0;text-decoration:underline;"
                       onclick="viewSchemeMembers({{ $scheme->id }})">
-                {{ $scheme->members_count }} member(s) — View
+                {{ $totalAssigned }} member(s) — View
               </button>
+              @if(($scheme->third_party_members_count ?? 0) > 0)
+                <div style="font-size:10px;color:#F59E0B;margin-top:2px;">
+                  ({{ $scheme->members_count ?? 0 }} reg + {{ $scheme->third_party_members_count }} external)
+                </div>
+              @endif
             </td>
             <td>
               <a href="{{ route('unit-admin.schemes.payers', $scheme->id) }}" class="ca">
@@ -90,7 +98,7 @@
 
 {{-- ══ CREATE MODAL ══ --}}
 <div class="mo" id="createSchemeModal">
-  <div class="md">
+  <div class="md" style="width:680px;max-width:96vw;">
     <div class="mh">
       <div class="mt2">New Scheme</div>
       <div class="mc3" onclick="cm('createSchemeModal')"><i class="fas fa-times"></i></div>
@@ -145,40 +153,78 @@
           @error('end_date') <span style="color:var(--red);font-size:11px;">{{ $message }}</span> @enderror
         </div>
 
+        {{-- MEMBERS SELECTION WITH THIRD-PARTY OPTION --}}
         <div class="fg s2">
-          <label>
-            Select Members
-            <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-dim);">
-              (only chosen members will see and pay this scheme)
-            </span>
-          </label>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
+            <div>
+              <span style="font-weight:600;font-size:13px;color:var(--text);">Select Members</span>
+              <span style="font-weight:400;font-size:11px;color:var(--text-dim);display:block;">
+                (Choose registered unit members and/or external third-party members)
+              </span>
+            </div>
+            <button type="button" class="btn bo bsm" onclick="openAddThirdPartyModal('create')"
+                    style="font-size:11px;padding:5px 12px;color:var(--accent);border-color:var(--accent);display:flex;align-items:center;gap:6px;">
+              <i class="fas fa-user-plus"></i> Add Third-Party Member
+            </button>
+          </div>
           @error('member_ids') <span style="color:var(--red);font-size:11px;display:block;margin-bottom:6px;">{{ $message }}</span> @enderror
 
-          <input type="text" placeholder="🔍 Search members..."
-                 onkeyup="filterMemberList('create_member_list', this.value)"
-                 style="margin-bottom:8px;">
+          <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;align-items:center;">
+            <input type="text" placeholder="🔍 Search by name, phone, email..."
+                   onkeyup="filterMemberList('create_member_list', this.value)"
+                   style="flex:1;min-width:180px;padding:6px 12px;font-size:12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text);">
+            <div style="display:flex;gap:4px;">
+              <button type="button" class="btn bo bsm filter-btn active" onclick="filterMemberType('create_member_list', 'all', this)">All</button>
+              <button type="button" class="btn bo bsm filter-btn" onclick="filterMemberType('create_member_list', 'reg', this)">Registered</button>
+              <button type="button" class="btn bo bsm filter-btn" onclick="filterMemberType('create_member_list', 'tp', this)">Third-Party</button>
+            </div>
+          </div>
 
-          <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
+          <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;font-size:11px;">
             <button type="button" class="btn bo bsm" onclick="toggleAllCheckboxes('create_member_list', true, 'create_selected_count')">Select All</button>
             <button type="button" class="btn bo bsm" onclick="toggleAllCheckboxes('create_member_list', false, 'create_selected_count')">Clear All</button>
-            <span id="create_selected_count" style="font-size:11px;color:var(--text-dim);margin-left:auto;">0 selected</span>
+            <span id="create_selected_count" style="color:var(--text-dim);margin-left:auto;">0 selected</span>
           </div>
 
           <div id="create_member_list"
-               style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px;">
+               style="max-height:240px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:6px;">
+            {{-- Registered Members --}}
             @foreach ($allMembers as $m)
-              <label class="member-check-row"
-                     style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;cursor:pointer;"
-                     onmouseover="this.style.background='rgba(79,142,247,0.08)'"
+              <label class="member-check-row" data-type="reg"
+                     style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:6px;cursor:pointer;"
+                     onmouseover="this.style.background='rgba(79,142,247,0.06)'"
                      onmouseout="this.style.background='transparent'">
                 <input type="checkbox" name="member_ids[]" value="{{ $m->id }}"
                        {{ (old('form_type') === 'create_scheme' && in_array($m->id, old('member_ids', []))) ? 'checked' : '' }}
                        onchange="updateSelectedCount('create_member_list', 'create_selected_count')"
                        style="width:16px;height:16px;flex-shrink:0;">
-                <span style="font-size:13px;">
-                  {{ $m->user->name ?? '—' }}
-                  <span style="color:var(--text-dim);font-size:11px;">({{ $m->user->email ?? '' }})</span>
-                </span>
+                <div style="display:flex;align-items:center;justify-content:space-between;width:100%;gap:10px;">
+                  <div>
+                    <span style="font-size:13px;font-weight:600;">{{ $m->user->name ?? '—' }}</span>
+                    <span style="color:var(--text-dim);font-size:11px;margin-left:6px;">{{ $m->user->phone ?? '' }} &bull; {{ $m->user->email ?? '' }}</span>
+                  </div>
+                  <span class="badge" style="background:rgba(79,142,247,0.12);color:var(--accent);font-size:10px;padding:2px 8px;">Registered</span>
+                </div>
+              </label>
+            @endforeach
+
+            {{-- Third-Party Members --}}
+            @foreach ($thirdPartyMembers as $tp)
+              <label class="member-check-row" data-type="tp"
+                     style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:6px;cursor:pointer;"
+                     onmouseover="this.style.background='rgba(245,158,11,0.06)'"
+                     onmouseout="this.style.background='transparent'">
+                <input type="checkbox" name="third_party_member_ids[]" value="{{ $tp->id }}"
+                       {{ (old('form_type') === 'create_scheme' && in_array($tp->id, old('third_party_member_ids', []))) ? 'checked' : '' }}
+                       onchange="updateSelectedCount('create_member_list', 'create_selected_count')"
+                       style="width:16px;height:16px;flex-shrink:0;">
+                <div style="display:flex;align-items:center;justify-content:space-between;width:100%;gap:10px;">
+                  <div>
+                    <span style="font-size:13px;font-weight:600;color:#F59E0B;">{{ $tp->name }}</span>
+                    <span style="color:var(--text-dim);font-size:11px;margin-left:6px;">{{ $tp->phone }} @if($tp->organization) &bull; {{ $tp->organization }} @endif</span>
+                  </div>
+                  <span class="badge" style="background:rgba(245,158,11,0.15);color:#F59E0B;border:1px solid rgba(245,158,11,0.3);font-size:10px;padding:2px 8px;">Third-Party</span>
+                </div>
               </label>
             @endforeach
           </div>
@@ -194,7 +240,7 @@
 
 {{-- ══ EDIT MODAL ══ --}}
 <div class="mo" id="editSchemeModal">
-  <div class="md">
+  <div class="md" style="width:680px;max-width:96vw;">
     <div class="mh">
       <div class="mt2">Edit Scheme</div>
       <div class="mc3" onclick="cm('editSchemeModal')"><i class="fas fa-times"></i></div>
@@ -254,40 +300,78 @@
           @error('end_date') <span style="color:var(--red);font-size:11px;">{{ $message }}</span> @enderror
         </div>
 
+        {{-- MEMBERS SELECTION WITH THIRD-PARTY OPTION --}}
         <div class="fg s2">
-          <label>
-            Select Members
-            <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-dim);">
-              (only chosen members will see and pay this scheme)
-            </span>
-          </label>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
+            <div>
+              <span style="font-weight:600;font-size:13px;color:var(--text);">Select Members</span>
+              <span style="font-weight:400;font-size:11px;color:var(--text-dim);display:block;">
+                (Choose registered unit members and/or external third-party members)
+              </span>
+            </div>
+            <button type="button" class="btn bo bsm" onclick="openAddThirdPartyModal('edit')"
+                    style="font-size:11px;padding:5px 12px;color:var(--accent);border-color:var(--accent);display:flex;align-items:center;gap:6px;">
+              <i class="fas fa-user-plus"></i> Add Third-Party Member
+            </button>
+          </div>
           @error('member_ids') <span style="color:var(--red);font-size:11px;display:block;margin-bottom:6px;">{{ $message }}</span> @enderror
 
-          <input type="text" placeholder="🔍 Search members..."
-                 onkeyup="filterMemberList('edit_member_list', this.value)"
-                 style="margin-bottom:8px;">
+          <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;align-items:center;">
+            <input type="text" placeholder="🔍 Search by name, phone, email..."
+                   onkeyup="filterMemberList('edit_member_list', this.value)"
+                   style="flex:1;min-width:180px;padding:6px 12px;font-size:12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text);">
+            <div style="display:flex;gap:4px;">
+              <button type="button" class="btn bo bsm filter-btn active" onclick="filterMemberType('edit_member_list', 'all', this)">All</button>
+              <button type="button" class="btn bo bsm filter-btn" onclick="filterMemberType('edit_member_list', 'reg', this)">Registered</button>
+              <button type="button" class="btn bo bsm filter-btn" onclick="filterMemberType('edit_member_list', 'tp', this)">Third-Party</button>
+            </div>
+          </div>
 
-          <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
+          <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;font-size:11px;">
             <button type="button" class="btn bo bsm" onclick="toggleAllCheckboxes('edit_member_list', true, 'edit_selected_count')">Select All</button>
             <button type="button" class="btn bo bsm" onclick="toggleAllCheckboxes('edit_member_list', false, 'edit_selected_count')">Clear All</button>
-            <span id="edit_selected_count" style="font-size:11px;color:var(--text-dim);margin-left:auto;">0 selected</span>
+            <span id="edit_selected_count" style="color:var(--text-dim);margin-left:auto;">0 selected</span>
           </div>
 
           <div id="edit_member_list"
-               style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px;">
+               style="max-height:240px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:6px;">
+            {{-- Registered Members --}}
             @foreach ($allMembers as $m)
-              <label class="member-check-row"
-                     style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;cursor:pointer;"
-                     onmouseover="this.style.background='rgba(79,142,247,0.08)'"
+              <label class="member-check-row" data-type="reg"
+                     style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:6px;cursor:pointer;"
+                     onmouseover="this.style.background='rgba(79,142,247,0.06)'"
                      onmouseout="this.style.background='transparent'">
                 <input type="checkbox" name="member_ids[]" value="{{ $m->id }}"
                        {{ (old('form_type') === 'edit_scheme' && in_array($m->id, old('member_ids', []))) ? 'checked' : '' }}
                        onchange="updateSelectedCount('edit_member_list', 'edit_selected_count')"
                        style="width:16px;height:16px;flex-shrink:0;">
-                <span style="font-size:13px;">
-                  {{ $m->user->name ?? '—' }}
-                  <span style="color:var(--text-dim);font-size:11px;">({{ $m->user->email ?? '' }})</span>
-                </span>
+                <div style="display:flex;align-items:center;justify-content:space-between;width:100%;gap:10px;">
+                  <div>
+                    <span style="font-size:13px;font-weight:600;">{{ $m->user->name ?? '—' }}</span>
+                    <span style="color:var(--text-dim);font-size:11px;margin-left:6px;">{{ $m->user->phone ?? '' }} &bull; {{ $m->user->email ?? '' }}</span>
+                  </div>
+                  <span class="badge" style="background:rgba(79,142,247,0.12);color:var(--accent);font-size:10px;padding:2px 8px;">Registered</span>
+                </div>
+              </label>
+            @endforeach
+
+            {{-- Third-Party Members --}}
+            @foreach ($thirdPartyMembers as $tp)
+              <label class="member-check-row" data-type="tp"
+                     style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:6px;cursor:pointer;"
+                     onmouseover="this.style.background='rgba(245,158,11,0.06)'"
+                     onmouseout="this.style.background='transparent'">
+                <input type="checkbox" name="third_party_member_ids[]" value="{{ $tp->id }}"
+                       {{ (old('form_type') === 'edit_scheme' && in_array($tp->id, old('third_party_member_ids', []))) ? 'checked' : '' }}
+                       onchange="updateSelectedCount('edit_member_list', 'edit_selected_count')"
+                       style="width:16px;height:16px;flex-shrink:0;">
+                <div style="display:flex;align-items:center;justify-content:space-between;width:100%;gap:10px;">
+                  <div>
+                    <span style="font-size:13px;font-weight:600;color:#F59E0B;">{{ $tp->name }}</span>
+                    <span style="color:var(--text-dim);font-size:11px;margin-left:6px;">{{ $tp->phone }} @if($tp->organization) &bull; {{ $tp->organization }} @endif</span>
+                  </div>
+                  <span class="badge" style="background:rgba(245,158,11,0.15);color:#F59E0B;border:1px solid rgba(245,158,11,0.3);font-size:10px;padding:2px 8px;">Third-Party</span>
+                </div>
               </label>
             @endforeach
           </div>
@@ -301,14 +385,70 @@
   </div>
 </div>
 
+{{-- ══ ADD THIRD-PARTY MEMBER MODAL ══ --}}
+<div class="mo" id="addThirdPartyModal">
+  <div class="md" style="width:540px;max-width:96vw;">
+    <div class="mh">
+      <div>
+        <div class="mt2"><i class="fas fa-user-plus" style="margin-right:6px;color:#F59E0B;"></i>Add Third-Party Member</div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:2px;">External individual for scheme only. No account or login credentials will be created.</div>
+      </div>
+      <div class="mc3" onclick="cm('addThirdPartyModal')"><i class="fas fa-times"></i></div>
+    </div>
+    <form id="addThirdPartyForm" onsubmit="submitThirdPartyMember(event)" enctype="multipart/form-data">
+      @csrf
+      <div class="fgrid">
+        <div class="fg s2">
+          <label>Full Name <span style="color:var(--red)">*</span></label>
+          <input type="text" id="tp_name" name="name" placeholder="Rajesh Kumar" required>
+        </div>
+        <div class="fg">
+          <label>Phone Number <span style="color:var(--red)">*</span></label>
+          <input type="text" id="tp_phone" name="phone" placeholder="9845002001" maxlength="15" required>
+        </div>
+        <div class="fg">
+          <label>Email (optional)</label>
+          <input type="email" id="tp_email" name="email" placeholder="rajesh@gmail.com">
+        </div>
+        <div class="fg">
+          <label>Date of Birth</label>
+          <input type="date" id="tp_dob" name="dob">
+        </div>
+        <div class="fg">
+          <label>Shop Name</label>
+          <input type="text" id="tp_org" name="organization" placeholder="Fathima Stores">
+        </div>
+        <div class="fg s2">
+          <label>Unit</label>
+          <input type="text" value="{{ $myUnit->name ?? 'My Unit' }}" disabled style="opacity:0.7;">
+        </div>
+        <div class="fg s2">
+          <label>Address</label>
+          <textarea id="tp_address" name="address" rows="2" placeholder="House name, street, area, PIN"></textarea>
+        </div>
+        <div class="fg s2">
+          <label>Upload Member Photo</label>
+          <input type="file" id="tp_photo" name="photo" accept="image/jpeg,image/png,image/jpg" style="padding:6px 11px;">
+        </div>
+      </div>
+      <div class="ff">
+        <button type="button" class="btn bo" onclick="cm('addThirdPartyModal')">Cancel</button>
+        <button type="submit" id="tp_submit_btn" class="btn bp" style="background:#F59E0B;border-color:#F59E0B;color:#000;font-weight:600;">
+          <i class="fas fa-check"></i> Save & Add to Scheme
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
 {{-- ══ VIEW MEMBERS MODAL ══ --}}
 <div class="mo" id="viewMembersModal">
-  <div class="md" style="width:420px">
+  <div class="md" style="width:520px;max-width:96vw;">
     <div class="mh">
       <div class="mt2" id="viewMembersTitle">Assigned Members</div>
       <div class="mc3" onclick="cm('viewMembersModal')"><i class="fas fa-times"></i></div>
     </div>
-    <div id="viewMembersList" style="max-height:400px;overflow-y:auto;padding:0 18px 18px;"></div>
+    <div id="viewMembersList" style="max-height:460px;overflow-y:auto;padding:0 18px 18px;"></div>
   </div>
 </div>
 
@@ -316,6 +456,86 @@
 
 @section('scripts')
 <script>
+let currentTargetForm = 'create';
+
+function openAddThirdPartyModal(target) {
+  currentTargetForm = target;
+  document.getElementById('addThirdPartyForm').reset();
+  om('addThirdPartyModal');
+}
+
+function submitThirdPartyMember(e) {
+  e.preventDefault();
+  const form = document.getElementById('addThirdPartyForm');
+  const submitBtn = document.getElementById('tp_submit_btn');
+  const originalText = submitBtn.innerHTML;
+
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+  const formData = new FormData(form);
+
+  fetch(`{{ route('unit-admin.schemes.third-party-member') }}`, {
+    method: 'POST',
+    body: formData,
+    headers: {
+      'X-Requested-With': 'XMLHttpRequest',
+      'Accept': 'application/json',
+    }
+  })
+  .then(res => {
+    if (!res.ok) {
+      return res.json().then(err => { throw err; });
+    }
+    return res.json();
+  })
+  .then(data => {
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = originalText;
+
+    if (data.success && data.member) {
+      const m = data.member;
+      const htmlRow = `
+        <label class="member-check-row" data-type="tp"
+               style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:6px;cursor:pointer;background:rgba(245,158,11,0.08);"
+               onmouseover="this.style.background='rgba(245,158,11,0.06)'"
+               onmouseout="this.style.background='transparent'">
+          <input type="checkbox" name="third_party_member_ids[]" value="${m.id}" checked
+                 onchange="updateSelectedCount('${currentTargetForm}_member_list', '${currentTargetForm}_selected_count')"
+                 style="width:16px;height:16px;flex-shrink:0;">
+          <div style="display:flex;align-items:center;justify-content:space-between;width:100%;gap:10px;">
+            <div>
+              <span style="font-size:13px;font-weight:600;color:#F59E0B;">${esc(m.name)}</span>
+              <span style="color:var(--text-dim);font-size:11px;margin-left:6px;">${esc(m.phone)} &bull; ${esc(m.organization || '—')}</span>
+            </div>
+            <span class="badge" style="background:rgba(245,158,11,0.15);color:#F59E0B;border:1px solid rgba(245,158,11,0.3);font-size:10px;padding:2px 8px;">Third-Party</span>
+          </div>
+        </label>
+      `;
+
+      const container = document.getElementById(`${currentTargetForm}_member_list`);
+      if (container) {
+        container.insertAdjacentHTML('afterbegin', htmlRow);
+        updateSelectedCount(`${currentTargetForm}_member_list`, `${currentTargetForm}_selected_count`);
+      }
+
+      cm('addThirdPartyModal');
+      alert(`Third-party member "${m.name}" created and selected for this scheme!`);
+    }
+  })
+  .catch(err => {
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = originalText;
+    let msg = 'Failed to add third-party member.';
+    if (err && err.errors) {
+      msg = Object.values(err.errors).flat().join('\n');
+    } else if (err && err.message) {
+      msg = err.message;
+    }
+    alert(msg);
+  });
+}
+
 function toggleAllCheckboxes(containerId, checked, countId) {
   document.querySelectorAll(`#${containerId} .member-check-row`).forEach(row => {
     if (row.style.display !== 'none') {
@@ -326,15 +546,31 @@ function toggleAllCheckboxes(containerId, checked, countId) {
 }
 
 function updateSelectedCount(containerId, countId) {
-  const checked = document.querySelectorAll(`#${containerId} input[type="checkbox"]:checked`).length;
-  document.getElementById(countId).textContent = checked + ' selected';
+  const regChecked = document.querySelectorAll(`#${containerId} input[name="member_ids[]"]:checked`).length;
+  const tpChecked = document.querySelectorAll(`#${containerId} input[name="third_party_member_ids[]"]:checked`).length;
+  const total = regChecked + tpChecked;
+  document.getElementById(countId).textContent = `${total} selected (${regChecked} reg, ${tpChecked} 3rd-party)`;
 }
 
 function filterMemberList(containerId, query) {
   query = query.toLowerCase();
   document.querySelectorAll(`#${containerId} .member-check-row`).forEach(row => {
     const text = row.textContent.toLowerCase();
-    row.style.display = text.includes(query) ? 'flex' : 'none';
+    const typeMatch = row.getAttribute('data-active-type-match') !== 'false';
+    row.style.display = (text.includes(query) && typeMatch) ? 'flex' : 'none';
+  });
+}
+
+function filterMemberType(containerId, type, btn) {
+  const parent = btn.parentElement;
+  parent.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  document.querySelectorAll(`#${containerId} .member-check-row`).forEach(row => {
+    const rowType = row.getAttribute('data-type');
+    let match = (type === 'all' || rowType === type);
+    row.setAttribute('data-active-type-match', match ? 'true' : 'false');
+    row.style.display = match ? 'flex' : 'none';
   });
 }
 
@@ -351,12 +587,19 @@ function editScheme(id) {
       document.getElementById('edit_end_date').min = data.start_date_raw;
       document.getElementById('edit_end_date').value = data.end_date_raw ?? '';
 
-      const assignedIds = (data.member_ids || []).map(String);
-      document.querySelectorAll('#edit_member_list input[type="checkbox"]').forEach(cb => {
-        cb.checked = assignedIds.includes(cb.value);
+      // Registered members
+      const regAssigned = (data.member_ids || []).map(String);
+      document.querySelectorAll('#edit_member_list input[name="member_ids[]"]').forEach(cb => {
+        cb.checked = regAssigned.includes(cb.value);
       });
-      updateSelectedCount('edit_member_list', 'edit_selected_count');
 
+      // Third-party members
+      const tpAssigned = (data.third_party_member_ids || []).map(String);
+      document.querySelectorAll('#edit_member_list input[name="third_party_member_ids[]"]').forEach(cb => {
+        cb.checked = tpAssigned.includes(cb.value);
+      });
+
+      updateSelectedCount('edit_member_list', 'edit_selected_count');
       om('editSchemeModal');
     })
     .catch(() => alert('Failed to load scheme data!'));
@@ -369,26 +612,68 @@ function viewSchemeMembers(id) {
       const list = document.getElementById('viewMembersList');
       list.innerHTML = '';
 
-      if (!data.members || data.members.length === 0) {
-        list.innerHTML = '<div style="padding:12px 0;color:var(--text-dim);text-align:center;">No members assigned.</div>';
+      const regMembers = data.members || [];
+      const tpMembers = data.third_party_members || [];
+
+      if (regMembers.length === 0 && tpMembers.length === 0) {
+        list.innerHTML = '<div style="padding:24px 0;color:var(--text-dim);text-align:center;">No members assigned to this scheme.</div>';
       } else {
-        data.members.forEach(m => {
-          list.innerHTML += `
-            <div style="padding:10px 0;border-bottom:1px solid var(--border);">
-              <div style="font-weight:600;font-size:13px;">${m.name}</div>
-              <div style="font-size:11px;color:var(--text-dim);">${m.email}</div>
-            </div>`;
-        });
+        let content = '';
+
+        if (regMembers.length > 0) {
+          content += `
+            <div style="font-weight:700;font-size:12px;color:var(--accent);text-transform:uppercase;letter-spacing:0.5px;margin:12px 0 6px;">
+              <i class="fas fa-users" style="margin-right:6px;"></i>Registered Members (${regMembers.length})
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px;">
+              ${regMembers.map(m => `
+                <div style="padding:8px 12px;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
+                  <div>
+                    <div style="font-weight:600;font-size:13px;color:var(--text);">${esc(m.name)}</div>
+                    <div style="font-size:11px;color:var(--text-dim);">${esc(m.phone || '—')} &bull; ${esc(m.email || 'No email')}</div>
+                  </div>
+                  <div><span class="utag">${esc(m.unit || 'My Unit')}</span></div>
+                </div>
+              `).join('')}
+            </div>
+          `;
+        }
+
+        if (tpMembers.length > 0) {
+          content += `
+            <div style="font-weight:700;font-size:12px;color:#F59E0B;text-transform:uppercase;letter-spacing:0.5px;margin:12px 0 6px;">
+              <i class="fas fa-user-tag" style="margin-right:6px;"></i>External Third-Party Members (${tpMembers.length})
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              ${tpMembers.map(m => `
+                <div style="padding:8px 12px;background:rgba(245,158,11,0.03);border:1px solid rgba(245,158,11,0.2);border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
+                  <div>
+                    <div style="font-weight:600;font-size:13px;color:#F59E0B;">${esc(m.name)} <span class="badge" style="background:rgba(245,158,11,0.2);color:#F59E0B;font-size:9px;margin-left:4px;">External</span></div>
+                    <div style="font-size:11px;color:var(--text-dim);">${esc(m.phone)} &bull; Shop: ${esc(m.organization || '—')} &bull; ${esc(m.email || 'No email')}</div>
+                  </div>
+                  <div><span class="utag">${esc(m.unit || 'My Unit')}</span></div>
+                </div>
+              `).join('')}
+            </div>
+          `;
+        }
+
+        list.innerHTML = content;
       }
 
-      document.getElementById('viewMembersTitle').textContent = data.title + ' — Assigned Members';
+      document.getElementById('viewMembersTitle').textContent = `${data.title} — Assigned Members (${regMembers.length + tpMembers.length})`;
       om('viewMembersModal');
     })
     .catch(() => alert('Failed to load member list!'));
 }
 
-// Re-open whichever modal failed validation, so errors are actually visible.
+function esc(str) {
+  if (!str) return '';
+  return String(str).replace(/[&<>"']/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[s]);
+}
+
 document.addEventListener('DOMContentLoaded', function () {
+  updateSelectedCount('create_member_list', 'create_selected_count');
   @if ($errors->any())
     @if (old('form_type') === 'create_scheme')
       om('createSchemeModal');
@@ -400,4 +685,11 @@ document.addEventListener('DOMContentLoaded', function () {
   @endif
 });
 </script>
+<style>
+.filter-btn.active {
+  background: var(--accent) !important;
+  color: #fff !important;
+  border-color: var(--accent) !important;
+}
+</style>
 @endsection

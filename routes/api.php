@@ -24,11 +24,48 @@ use App\Http\Controllers\APIDistrictAdmin\DistrictAdminApiController;
 // No token required
 // ═════════════════════════════════
 
+// ── RUN CERTIFICATE MIGRATION HELPER ──
+Route::get('/run-certificate-migrations', function () {
+    try {
+        \Illuminate\Support\Facades\Schema::table('units', function (\Illuminate\Database\Schema\Blueprint $table) {
+            $cols = [
+                'certificate_logo',
+                'certificate_seal_text',
+                'certificate_president_name',
+                'certificate_secretary_name',
+                'signatory_1_name',
+                'signatory_1_title',
+                'signatory_1_signature',
+                'signatory_2_name',
+                'signatory_2_title',
+                'signatory_2_signature',
+                'signatory_3_name',
+                'signatory_3_title',
+                'signatory_3_signature',
+            ];
+            foreach ($cols as $col) {
+                if (!\Illuminate\Support\Facades\Schema::hasColumn('units', $col)) {
+                    $table->string($col)->nullable();
+                }
+            }
+        });
+        return response()->json([
+            'status'  => 'success',
+            'message' => "All certificate and signatory columns exist in 'units' table!",
+        ]);
+    } catch (\Throwable $e) {
+        return response()->json([
+            'status'  => 'error',
+            'message' => $e->getMessage(),
+        ], 500);
+    }
+});
+
 // ── AUTH ──
-Route::post('/login',
+Route::match(['GET', 'POST'], '/login',
     [AuthController::class, 'login']);
     
-Route::post('/v2/login',
+Route::match(['GET', 'POST'], '/v2/login',
     [AuthController::class, 'loginV2'])->middleware('throttle:5,1'); 
     
 Route::post('/register',

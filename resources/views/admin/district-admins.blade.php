@@ -110,7 +110,7 @@
         </div>
         <div class="fg">
           <label>Email</label>
-          <input type="email" name="email" value="{{ old('email') }}" placeholder="districtadmin@fumma.com" required>
+          <input type="email" name="email" value="{{ old('email') }}" placeholder="districtadmin@membernet.com" required>
         </div>
         <div class="fg">
           <label>Phone</label>

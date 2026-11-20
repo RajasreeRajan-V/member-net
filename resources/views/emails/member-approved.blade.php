@@ -55,7 +55,7 @@
 <div class="wrap">
 
   <div class="header">
-    <h1>🎓 Fumma</h1>
+    <h1>🎓 Member Net</h1>
     <div class="badge">✅ Membership Approved</div>
   </div>
 
@@ -67,7 +67,7 @@
 
     <p>Dear <b>{{ $memberName }}</b>,</p>
     <p>
-      Your Fumma membership application for <b>{{ $unitName }}</b> unit
+      Your Member Net membership application for <b>{{ $unitName }}</b> unit
       has been reviewed and approved by your Unit Admin. Here are your login
       credentials — keep them safe.
     </p>
@@ -96,7 +96,7 @@
       <tr>
         <td class="step-num-td"><span class="step-num">1</span></td>
         <td class="step-text">
-          Log in to the Fumma app using your <b>Membership ID</b> and
+          Log in to the Member Net app using your <b>Membership ID</b> and
           <b>phone number</b> as the password.
         </td>
       </tr>
@@ -132,7 +132,7 @@
   </div>
 
   <div class="footer">
-    &copy; {{ date('Y') }} Fumma
+    &copy; {{ date('Y') }} Member Net
   </div>
 
 </div>

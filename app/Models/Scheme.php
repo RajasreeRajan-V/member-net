@@ -17,8 +17,15 @@ class Scheme extends Model
     {
         return $this->belongsToMany(MemberProfile::class, 'scheme_members', 'scheme_id', 'member_profile_id');
     }
+
+    // External third-party members associated with this scheme
+    public function thirdPartyMembers()
+    {
+        return $this->belongsToMany(SchemeThirdPartyMember::class, 'scheme_third_party_member', 'scheme_id', 'third_party_member_id');
+    }
+
     public function createdBy()
-{
-    return $this->belongsTo(User::class, 'created_by');
-}
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
 }

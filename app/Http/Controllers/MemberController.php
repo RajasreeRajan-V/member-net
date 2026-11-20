@@ -51,8 +51,8 @@ class MemberController extends Controller
             'photo'           => 'required|string',
             'organization'    => 'required|string',
             'address'         => 'required|string|max:500',
-            'state_id'        => 'required|exists:states,id',
-            'district_id'     => 'required|exists:districts,id',
+            'state_id'        => 'nullable|exists:states,id',
+            'district_id'     => 'nullable|exists:districts,id',
             'unit_id'         => 'required|exists:units,id',
             'is_fumma_member' => 'nullable|in:0,1',
         ], [
@@ -92,15 +92,13 @@ class MemberController extends Controller
             return ApiResponse::error('No registration fee configured. Contact admin.', 400);
         }
 
-        $district = District::find($request->district_id);
-        if ($district->state_id != $request->state_id) {
-            return ApiResponse::error('District does not belong to selected state.', 400);
+        $unit = Unit::find($request->unit_id);
+        if (!$unit) {
+            return ApiResponse::error('Selected unit not found.', 404);
         }
 
-        $unit = Unit::find($request->unit_id);
-        if ($unit->district_id != $request->district_id) {
-            return ApiResponse::error('Unit does not belong to selected district.', 400);
-        }
+        $district = $request->district_id ? District::find($request->district_id) : $unit->district;
+        $state    = $request->state_id ? State::find($request->state_id) : $unit->district?->state;
 
         // ── Save photo (always present now) ──
         $fileName = 'member_' . uniqid() . '.jpg';
@@ -121,8 +119,8 @@ class MemberController extends Controller
             'fee_id'          => $fee->id,
             'plan_id'         => null,
             'unit_id'         => $request->unit_id,
-            'district_id'     => $request->district_id,
-            'state_id'        => $request->state_id,
+            'district_id'     => null,
+            'state_id'        => $request->state_id ?? State::fixed()?->id ?? 1,
             'status'          => 'PENDING',
             'dob'             => $request->dob,
             'organization'    => $request->organization,
@@ -132,8 +130,6 @@ class MemberController extends Controller
             'membership_id'   => null,
             'joined_date'     => null,
         ]);
-
-        $state = State::find($request->state_id);
 
         return ApiResponse::success(
             [
@@ -148,8 +144,8 @@ class MemberController extends Controller
                 'status'          => $profile->status,
                 'photo'           => asset('storage/' . $photoPath),
                 'unit_name'       => $unit->name,
-                'district_name'   => $district->name,
-                'state_name'      => $state->name,
+                'district_name'   => $district?->name ?? '—',
+                'state_name'      => $state?->name ?? '—',
             ],
             'Registration successful. Please wait for Unit Admin approval.',
             201
@@ -229,7 +225,7 @@ class MemberController extends Controller
     public function getProfile()
     {
         $user    = auth()->user();
-        $profile = MemberProfile::with(['unit', 'district', 'state'])
+        $profile = MemberProfile::with(['unit', 'state'])
                     ->where('user_id', $user->id)
                     ->first();
 
@@ -253,11 +249,9 @@ class MemberController extends Controller
                 'membership_id'   => $profile->membership_id,
                 'status'          => $profile->status,
                 'unit_id'         => (string) $profile->unit_id,
-                'unit_name'       => $profile->unit->name,
-                'district_id'     => (string) $profile->district_id,
-                'district_name'   => $profile->district->name,
+                'unit_name'       => $profile->unit?->name,
                 'state_id'        => (string) $profile->state_id,
-                'state_name'      => $profile->state->name,
+                'state_name'      => $profile->state?->name ?? 'Kerala',
                 'joined_date'     => (string) $profile->joined_date,
                 'expiry_date'     => (string) $profile->expiry_date,
             ],
@@ -357,7 +351,7 @@ class MemberController extends Controller
         $user->save();
 
         // ── Reload relations ──
-        $profile->load(['unit', 'district', 'state']);
+        $profile->load(['unit', 'state']);
 
         return ApiResponse::success(
             [
@@ -376,11 +370,9 @@ class MemberController extends Controller
                 'membership_id'   => $profile->membership_id,
                 'status'          => $profile->status,
                 'unit_id'         => (string) $profile->unit_id,
-                'unit_name'       => $profile->unit->name,
-                'district_id'     => (string) $profile->district_id,
-                'district_name'   => $profile->district->name,
+                'unit_name'       => $profile->unit?->name,
                 'state_id'        => (string) $profile->state_id,
-                'state_name'      => $profile->state->name,
+                'state_name'      => $profile->state?->name ?? 'Kerala',
                 'joined_date'     => (string) $profile->joined_date,
                 'expiry_date'     => (string) $profile->expiry_date,
             ],
@@ -412,8 +404,8 @@ class MemberController extends Controller
                 'photo'           => $profile->photo
                                         ? asset('storage/' . $profile->photo)
                                         : null,
-                'unit_name'       => $profile->unit->name,
-                'district_name'   => $profile->district->name,
+                'unit_name'       => $profile->unit->name ?? '—',
+                'district_name'   => $profile->district?->name ?? '—',
                 'state_name'      => $profile->state->name,
                 'joined_date'     => (string) $profile->joined_date,
                 'expiry_date'     => (string) $profile->expiry_date,
@@ -456,8 +448,8 @@ class MemberController extends Controller
                 'status'          => $profile->status,
                 'unit_id'         => (string) $profile->unit_id,
                 'unit_name'       => $profile->unit->name,
-                'district_id'     => (string) $profile->district_id,
-                'district_name'   => $profile->district->name,
+                'district_id'     => (string) ($profile->district_id ?? ''),
+                'district_name'   => $profile->district?->name ?? '—',
                 'state_id'        => (string) $profile->state_id,
                 'state_name'      => $profile->state->name,
                 'joined_date'     => (string) $profile->joined_date,
@@ -676,8 +668,8 @@ class MemberController extends Controller
                                         : null,
                 'membership_type' => $profile->membership_type,
                 'status'          => $profile->status,
-                'unit_name'       => $profile->unit->name,
-                'district_name'   => $profile->district->name,
+                'unit_name'       => $profile->unit->name ?? '—',
+                'district_name'   => $profile->district?->name ?? '—',
                 'state_name'      => $profile->state->name,
                 'registered_on'   => (string) $profile->created_at,
             ],
@@ -861,17 +853,32 @@ public function certificateInfo()
         $token    = substr(hash_hmac('sha256', (string) $profile->id, config('app.key')), 0, 16);
         $relative = 'certificates/certificate_' . $profile->id . '_' . $token . '.pdf';
 
-        $logoPath = public_path('fumma-logo.png');
-        $logo     = file_exists($logoPath)
-            ? 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath))
-            : null;
+        // ── DYNAMIC UNIT-SPECIFIC CERTIFICATE LOGO ──
+        $unit          = $profile->unit;
+        $logoDataUrl   = null;
+        $logoPublicUrl = asset('fumma-logo.png');
+        $isCustomLogo  = false;
+
+        if ($unit && $unit->certificate_logo && Storage::disk('public')->exists($unit->certificate_logo)) {
+            $realLogoPath = Storage::disk('public')->path($unit->certificate_logo);
+            $mime         = @mime_content_type($realLogoPath) ?: 'image/png';
+            $logoDataUrl  = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($realLogoPath));
+            $logoPublicUrl = asset('storage/' . $unit->certificate_logo);
+            $isCustomLogo  = true;
+        } else {
+            $defaultLogoPath = public_path('fumma-logo.png');
+            if (file_exists($defaultLogoPath)) {
+                $logoDataUrl = 'data:image/png;base64,' . base64_encode(file_get_contents($defaultLogoPath));
+            }
+        }
 
         $pdf = Pdf::loadView('certificates.membership', [
-    'profile' => $profile,
-    'logo'    => $logo,
-])->setPaper('a4', 'landscape');   // was 'portrait'
+            'profile' => $profile,
+            'unit'    => $unit,
+            'logo'    => $logoDataUrl,
+        ])->setPaper('a4', 'landscape');
 
-        // Saved fresh each time, so name/date changes always show on the certificate
+        // Saved fresh each time, so unit logo/name/date changes always show immediately on the certificate
         Storage::disk('public')->put($relative, $pdf->output());
     } catch (\Throwable $e) {
         \Illuminate\Support\Facades\Log::error('Certificate generation failed: ' . $e->getMessage());
@@ -881,10 +888,34 @@ public function certificateInfo()
     return ApiResponse::success(
         [
             'membership_id'   => $profile->membership_id,
-            'message'         => 'Successfully! Now you are a FUMMA member.',
+            'message'         => 'Successfully! Now you are a Member Net member.',
             'certificate_url' => asset('storage/' . $relative),
+            'unit'            => [
+                'id'                         => $unit->id ?? null,
+                'name'                       => $unit->name ?? null,
+                'certificate_logo'           => $logoPublicUrl,
+                'is_custom_certificate_logo' => $isCustomLogo,
+                'certificate_seal_text'      => $unit->certificate_seal_text ?? null,
+                'signatory_1' => [
+                    'name'        => ($unit && $unit->signatory_1_name) ? $unit->signatory_1_name : (($unit && $unit->certificate_president_name) ? $unit->certificate_president_name : 'Tony Pulickal'),
+                    'designation' => ($unit && $unit->signatory_1_title) ? $unit->signatory_1_title : (($unit && ($unit->signatory_1_name || $unit->certificate_president_name)) ? ($unit->name . ' Unit President') : 'State President'),
+                    'signature'   => ($unit && $unit->signatory_1_signature) ? asset('storage/' . $unit->signatory_1_signature) : asset('sign-president.png'),
+                ],
+                'signatory_2' => [
+                    'name'        => ($unit && $unit->signatory_2_name) ? $unit->signatory_2_name : (($unit && $unit->certificate_secretary_name) ? $unit->certificate_secretary_name : 'Shaji Manhar'),
+                    'designation' => ($unit && $unit->signatory_2_title) ? $unit->signatory_2_title : (($unit && ($unit->signatory_2_name || $unit->certificate_secretary_name)) ? ($unit->name . ' Unit Gen. Secretary') : 'State General Secretary'),
+                    'signature'   => ($unit && $unit->signatory_2_signature) ? asset('storage/' . $unit->signatory_2_signature) : asset('sign-secretary.png'),
+                ],
+                'signatory_3' => [
+                    'name'        => ($unit && $unit->signatory_3_name) ? $unit->signatory_3_name : 'Rafi Puthoor',
+                    'designation' => ($unit && $unit->signatory_3_title) ? $unit->signatory_3_title : (($unit && $unit->signatory_3_name) ? ($unit->name . ' Unit Treasurer') : 'State Treasurer'),
+                    'signature'   => ($unit && $unit->signatory_3_signature) ? asset('storage/' . $unit->signatory_3_signature) : asset('sign-treasurer.png'),
+                ],
+                'president_name'             => ($unit && $unit->signatory_1_name) ? $unit->signatory_1_name : ($unit->certificate_president_name ?? null),
+                'secretary_name'             => ($unit && $unit->signatory_2_name) ? $unit->signatory_2_name : ($unit->certificate_secretary_name ?? null),
+            ],
         ],
-        'Congratulations! You are now a FUMMA member.'
+        'Congratulations! You are now a Member Net member.'
     );
 }
 

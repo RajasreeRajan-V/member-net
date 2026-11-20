@@ -34,7 +34,7 @@
   </div>
 
   <div class="tw">
-    <table>
+    <table style="min-width: 840px;">
       <thead>
         <tr>
           <th>#</th>

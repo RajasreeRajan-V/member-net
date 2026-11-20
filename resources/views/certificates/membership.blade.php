@@ -1,17 +1,45 @@
 @php
     $joined = \Carbon\Carbon::parse($profile->joined_date ?? now());
+    $unitObj = $unit ?? $profile->unit ?? null;
+    $hasGd = extension_loaded('gd');
 
-    // Signatories: change names/titles here if they have changed
-    $sigs = [
-        ['name' => 'Tony Pulickal', 'title' => 'State President',          'dist' => 'Dist.: President',         'img' => 'sign-president.png'],
-        ['name' => 'Shaji Manhar',  'title' => 'State General Secretary',  'dist' => 'Dist.: General Secretary', 'img' => 'sign-secretary.png'],
-        ['name' => 'Rafi Puthoor',  'title' => 'State Treasurer',          'dist' => 'Dist.: Treasurer',         'img' => 'sign-treasurer.png'],
-    ];
-
-    $img = function ($path) {
-        $f = public_path($path);
-        return file_exists($f) ? 'data:image/png;base64,' . base64_encode(file_get_contents($f)) : null;
+    $resolveSignDataUrl = function ($customStoragePath, $defaultPublicFile) use ($hasGd) {
+        if (!$hasGd) return null;
+        if ($customStoragePath && \Illuminate\Support\Facades\Storage::disk('public')->exists($customStoragePath)) {
+            $path = \Illuminate\Support\Facades\Storage::disk('public')->path($customStoragePath);
+            $mime = @mime_content_type($path) ?: 'image/png';
+            return 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($path));
+        }
+        if ($defaultPublicFile) {
+            $path = public_path($defaultPublicFile);
+            if (file_exists($path)) {
+                $mime = @mime_content_type($path) ?: 'image/png';
+                return 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($path));
+            }
+        }
+        return null;
     };
+
+    // Signatory 1 (President)
+    $s1Name  = ($unitObj && $unitObj->signatory_1_name) ? $unitObj->signatory_1_name : (($unitObj && $unitObj->certificate_president_name) ? $unitObj->certificate_president_name : 'Tony Pulickal');
+    $s1Title = ($unitObj && $unitObj->signatory_1_title) ? $unitObj->signatory_1_title : (($unitObj && ($unitObj->signatory_1_name || $unitObj->certificate_president_name)) ? ($unitObj->name . ' Unit President') : 'State President');
+    $s1Img   = $resolveSignDataUrl($unitObj->signatory_1_signature ?? null, 'sign-president.png');
+
+    // Signatory 2 (General Secretary)
+    $s2Name  = ($unitObj && $unitObj->signatory_2_name) ? $unitObj->signatory_2_name : (($unitObj && $unitObj->certificate_secretary_name) ? $unitObj->certificate_secretary_name : 'Shaji Manhar');
+    $s2Title = ($unitObj && $unitObj->signatory_2_title) ? $unitObj->signatory_2_title : (($unitObj && ($unitObj->signatory_2_name || $unitObj->certificate_secretary_name)) ? ($unitObj->name . ' Unit Gen. Secretary') : 'State General Secretary');
+    $s2Img   = $resolveSignDataUrl($unitObj->signatory_2_signature ?? null, 'sign-secretary.png');
+
+    // Signatory 3 (Treasurer)
+    $s3Name  = ($unitObj && $unitObj->signatory_3_name) ? $unitObj->signatory_3_name : 'Rafi Puthoor';
+    $s3Title = ($unitObj && $unitObj->signatory_3_title) ? $unitObj->signatory_3_title : (($unitObj && $unitObj->signatory_3_name) ? ($unitObj->name . ' Unit Treasurer') : 'State Treasurer');
+    $s3Img   = $resolveSignDataUrl($unitObj->signatory_3_signature ?? null, 'sign-treasurer.png');
+
+    $sigs = [
+        ['name' => $s1Name, 'title' => $s1Title, 'img' => $s1Img],
+        ['name' => $s2Name, 'title' => $s2Title, 'img' => $s2Img],
+        ['name' => $s3Name, 'title' => $s3Title, 'img' => $s3Img],
+    ];
 @endphp
 <!DOCTYPE html>
 <html>
@@ -111,10 +139,12 @@
     <div class="memno">Membership No: <span>{{ $profile->membership_id }}</span></div>
 
     <div class="logo">
-        @if($logo)
+        @if($logo && $hasGd)
             <img src="{{ $logo }}">
         @else
-            <div class="logo-text">FUMMA</div>
+            <div class="logo-text" style="font-size:24px;font-weight:bold;color:#14213d;letter-spacing:1px;padding-top:12px;">
+                {{ $unitObj->name ?? 'FuMMA' }}
+            </div>
         @endif
     </div>
 
@@ -135,7 +165,7 @@
         </div>
 
         <div class="place">
-            Unit: {{ $profile->unit->name ?? '' }} &nbsp;|&nbsp; District: {{ $profile->district->name ?? '' }}
+            Unit: {{ $profile->unit->name ?? '' }}
         </div>
     </div>
 
@@ -144,14 +174,13 @@
             @foreach($sigs as $s)
                 <td>
                     <div class="sig-img">
-                        @if($i = $img($s['img']))
-                            <img src="{{ $i }}">
+                        @if(!empty($s['img']))
+                            <img src="{{ $s['img'] }}" style="max-height:48px;max-width:180px;object-fit:contain;">
                         @endif
                     </div>
                     <div class="sig-line"></div>
                     <div class="sig-name">{{ $s['name'] }}</div>
-                    <div>{{ $s['title'] }}</div>
-                    <div class="sig-dist">{{ $s['dist'] }}</div>
+                    <div style="font-size:11.5px;color:#333;">{{ $s['title'] }}</div>
                 </td>
             @endforeach
         </tr>
@@ -170,7 +199,7 @@
 
     <div class="seal">
         <div class="seal-in">
-            <div class="seal-t1">FUMMA</div>
+            <div class="seal-t1">{{ ($unitObj && $unitObj->certificate_seal_text) ? $unitObj->certificate_seal_text : 'Member Net' }}</div>
             <div class="seal-yr">{{ $joined->format('Y') }}</div>
             <div class="seal-t2">MEMBER</div>
         </div>

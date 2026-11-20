@@ -12,9 +12,14 @@
       <div class="ct">
         <i class="fas fa-users"></i>All Members
       </div>
-      <button class="btn bp bsm" onclick="resetAddMemberModal(); om('addMemberM')">
-        <i class="fas fa-plus"></i>Add Member
-      </button>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <a href="{{ route('admin.members.download-all', request()->query()) }}" class="btn bo bsm" title="Download all filtered members as Excel">
+          <i class="fas fa-file-excel"></i>Download Excel
+        </a>
+        <button class="btn bp bsm" onclick="resetAddMemberModal(); om('addMemberM')">
+          <i class="fas fa-plus"></i>Add Member
+        </button>
+      </div>
     </div>
 
     {{-- FILTERS --}}
@@ -22,6 +27,16 @@
           style="display:flex;gap:8px;padding:12px 16px;
                  border-bottom:1px solid var(--border);
                  flex-wrap:wrap;align-items:center;">
+      <div style="position:relative;display:flex;align-items:center;">
+        <i class="fas fa-search" style="position:absolute;left:10px;color:var(--text-dim);font-size:11px;pointer-events:none;"></i>
+        <input type="text" name="search" value="{{ $search ?? '' }}"
+               placeholder="Member ID or Phone..."
+               style="padding:5px 12px 5px 28px;font-size:11px;
+                      border-radius:20px;border:1px solid var(--border);
+                      background:transparent;color:var(--text);
+                      width:190px;outline:none;">
+      </div>
+
       <select name="status" style="padding:4px 10px;font-size:11px;
                  border-radius:20px;border:1px solid var(--border);
                  background:transparent;color:var(--text-dim);
@@ -34,21 +49,21 @@
         <option value="EXPIRED"  {{ $status == 'EXPIRED'  ? 'selected' : '' }}>Expired</option>
       </select>
 
-      <select name="district_id" style="padding:4px 10px;font-size:11px;
+      <select name="unit_id" style="padding:4px 10px;font-size:11px;
                  border-radius:20px;border:1px solid var(--border);
                  background:transparent;color:var(--text-dim);
                  width:auto;cursor:pointer;">
-        <option value="">All Districts</option>
-        @foreach($districts as $district)
-          <option value="{{ $district->id }}"
-            {{ $district_id == $district->id ? 'selected' : '' }}>
-            {{ $district->name }}
+        <option value="">All Units</option>
+        @foreach($units as $unit)
+          <option value="{{ $unit->id }}"
+            {{ ($unit_id ?? '') == $unit->id ? 'selected' : '' }}>
+            {{ $unit->name }}
           </option>
         @endforeach
       </select>
 
       <button type="submit" class="btn bp bsm">
-        <i class="fas fa-filter"></i>Filter
+        <i class="fas fa-search"></i>Search
       </button>
       <a href="{{ route('admin.members') }}" class="btn bo bsm">
         <i class="fas fa-times"></i>Clear
@@ -57,16 +72,14 @@
 
     {{-- TABLE --}}
     <div class="tw">
-      <table>
+      <table style="min-width: 880px;">
         <thead>
           <tr>
             <th>#</th>
             <th>Member</th>
             <th>Phone</th>
             <th>Unit</th>
-            <th>District</th>
             <th>Membership ID</th>
-            <th>FUMMA</th>
             <th>Status</th>
             <th>Registered</th>
             <th>Actions</th>
@@ -79,7 +92,7 @@
                 {{ ($members->currentPage() - 1) * $members->perPage() + $loop->iteration }}
               </td>
               <td>
-                <div class="mc2">
+                <div class="mc2" style="cursor:pointer;" onclick="viewMember({{ $member->id }})" title="Click to view member details">
                   @if($member->photo)
                     <img src="{{ asset('storage/' . $member->photo) }}"
                          style="width:32px;height:32px;border-radius:6px;object-fit:cover;">
@@ -96,15 +109,7 @@
               </td>
               <td style="color:var(--text-dim)">{{ $member->user->phone }}</td>
               <td><span class="utag">{{ $member->unit->name }}</span></td>
-              <td style="color:var(--text-dim)">{{ $member->district->name }}</td>
               <td style="color:var(--text-dim)">{{ $member->membership_id ?? '—' }}</td>
-<td>
-  @if($member->is_fumma_member)
-    <span class="badge bap">FUMMA</span>
-  @else
-    <span style="color:var(--text-dim);font-size:11px;">—</span>
-  @endif
-</td>
               <td>
                 <span class="badge
                   @if($member->status == 'PENDING')  bpe
@@ -161,9 +166,16 @@
             </tr>
           @empty
             <tr>
-              <td colspan="10"
+              <td colspan="8"
                   style="text-align:center;color:var(--text-dim);padding:30px;">
-                No members found
+                @if(request()->filled('search'))
+                  <div>No members found matching "<strong>{{ request('search') }}</strong>"</div>
+                  <div style="margin-top:8px;">
+                    <a href="{{ route('admin.members') }}" class="btn bo bsm">Clear Search</a>
+                  </div>
+                @else
+                  No members found
+                @endif
               </td>
             </tr>
           @endforelse
@@ -269,53 +281,20 @@
 
         <div style="padding:6px 18px 0;font-size:10px;font-weight:700;
                     text-transform:uppercase;letter-spacing:1px;color:var(--accent);">
-          Location
+          Unit
         </div>
-                <div class="fgrid">
-          @if($fixedState)
-            {{-- Kerala is fixed: hidden state, districts already loaded --}}
-            <input type="hidden" name="state_id" id="memberStateId" value="{{ $fixedState->id }}">
-            <div class="fg">
-              <label>District</label>
-              <select id="memberDistrict" name="district_id"
-                      onchange="loadMemberUnits(this.value)" required>
-                <option value="">Select District</option>
-                @foreach($districts as $d)
-                  <option value="{{ $d->id }}">{{ $d->name }}</option>
-                @endforeach
-              </select>
-            </div>
-            <div class="fg">
-              <label>Unit</label>
-              <select id="memberUnit" name="unit_id" required>
-                <option value="">Select District First</option>
-              </select>
-            </div>
-          @else
-            <div class="fg">
-              <label>State</label>
-              <select id="addMemberState" onchange="loadMemberDistricts(this.value)" required>
-                <option value="">Select State</option>
-                @foreach($states as $state)
-                  <option value="{{ $state->id }}">{{ $state->name }}</option>
-                @endforeach
-              </select>
-            </div>
-            <div class="fg">
-              <label>District</label>
-              <select id="memberDistrict" name="district_id"
-                      onchange="loadMemberUnits(this.value)" required>
-                <option value="">Select State First</option>
-              </select>
-            </div>
-            <div class="fg">
-              <label>Unit</label>
-              <select id="memberUnit" name="unit_id" required>
-                <option value="">Select District First</option>
-              </select>
-            </div>
-            <input type="hidden" name="state_id" id="memberStateId">
-          @endif
+        <div class="fgrid">
+          <div class="fg s2">
+            <label>Unit</label>
+            <select id="memberUnit" name="unit_id" required>
+              <option value="">Select Unit</option>
+              @foreach($units as $u)
+                <option value="{{ $u->id }}" {{ old('unit_id') == $u->id ? 'selected' : '' }}>
+                  {{ $u->name }}
+                </option>
+              @endforeach
+            </select>
+          </div>
         </div>
 
         <div style="margin:0 18px 14px;padding:10px 12px;
@@ -485,15 +464,18 @@
 
   {{-- ══ VIEW MEMBER MODAL ══ --}}
   <div id="viewMemberM" class="mo">
-    <div class="md" style="width:560px">
+    <div class="md" style="max-width:680px;width:95%;max-height:90vh;overflow-y:auto;border-radius:16px;">
       <div class="mh">
-        <span class="mt2">Member Detail</span>
+        <span class="mt2" style="display:flex;align-items:center;gap:8px;"><i class="fas fa-id-card" style="color:var(--accent);"></i>Member Profile & Details</span>
         <div class="mc3" onclick="cm('viewMemberM')">
           <i class="fas fa-times"></i>
         </div>
       </div>
       <div id="memberContent" style="padding:20px">Loading...</div>
-      <div class="ff">
+      <div class="ff" style="display:flex;justify-content:space-between;align-items:center;">
+        <a id="adminDownloadMemberBtn" href="#" class="btn bp bsm" target="_blank">
+          <i class="fas fa-file-excel"></i>Download Excel
+        </a>
         <button class="btn bo" onclick="cm('viewMemberM')">Close</button>
       </div>
     </div>
@@ -514,9 +496,6 @@ function esc(v) {
 }
 
 // ── Reset "Add Member" modal ──
-const KERALA_FIXED = {{ $fixedState ? 'true' : 'false' }};
-
-// ── Reset "Add Member" modal ──
 function resetAddMemberModal() {
   const errBox = document.getElementById('addMemberError');
   if (errBox) errBox.remove();
@@ -526,24 +505,10 @@ function resetAddMemberModal() {
 
   // form.reset() restores old('...') defaults, so clear text fields explicitly
   ['addMemberName', 'addMemberEmail', 'addMemberPhone',
-   'addMemberDob', 'addMemberOrg', 'addMemberAddress'].forEach(id => {
+   'addMemberDob', 'addMemberOrg', 'addMemberAddress', 'memberUnit'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
-
-  const districtSel = document.getElementById('memberDistrict');
-  const unitSel     = document.getElementById('memberUnit');
-
-  if (unitSel) unitSel.innerHTML = '<option value="">Select District First</option>';
-
-  if (KERALA_FIXED) {
-    // Keep the Kerala district list and the hidden Kerala state_id
-    if (districtSel) districtSel.value = '';
-  } else {
-    if (districtSel) districtSel.innerHTML = '<option value="">Select State First</option>';
-    const stateHidden = document.getElementById('memberStateId');
-    if (stateHidden) stateHidden.value = '';
-  }
 }
 
 // ── Reset "Edit Member" modal ──
@@ -601,115 +566,214 @@ function openDeleteMember(id, name) {
   setTimeout(() => document.getElementById('deleteMemberPassword').focus(), 100);
 }
 
-function loadMemberDistricts(stateId) {
-  document.getElementById('memberStateId').value = stateId;
+// ── Helper functions for Member Details Modal ──
+function renderMemberTile(icon, label, value, isLink = false, linkHref = '') {
+  const displayVal = (value !== null && value !== undefined && String(value).trim() !== '') ? String(value).trim() : '—';
+  const content = isLink && displayVal !== '—'
+    ? `<a href="${esc(linkHref)}" style="color:var(--text);text-decoration:none;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text)'">${esc(displayVal)}</a>`
+    : esc(displayVal);
 
-  const districtSel = document.getElementById('memberDistrict');
-  const unitSel = document.getElementById('memberUnit');
-
-  if (!stateId) {
-    districtSel.innerHTML = '<option value="">Select State First</option>';
-    unitSel.innerHTML = '<option value="">Select District First</option>';
-    return;
-  }
-
-  districtSel.innerHTML = '<option value="">Loading...</option>';
-  unitSel.innerHTML = '<option value="">Select District First</option>';
-
-  fetch(`{{ url('/api/districts') }}`, {
-    method: 'POST',
-    headers: {
-      'Accept': 'application/json',
-      'Content-Type': 'application/json',
-      'X-CSRF-TOKEN': '{{ csrf_token() }}'
-    },
-    body: JSON.stringify({ state_id: stateId })
-  })
-  .then(r => r.json())
-  .then(data => {
-    districtSel.innerHTML = '<option value="">Select District</option>';
-    if (data.data && data.data.length > 0) {
-      data.data.forEach(d => {
-        districtSel.innerHTML += `<option value="${d.id}">${esc(d.name)}</option>`;
-      });
-    } else {
-      districtSel.innerHTML = '<option value="">No districts found</option>';
-    }
-  })
-  .catch(err => {
-    districtSel.innerHTML = '<option value="">Error loading districts</option>';
-    console.error('District load failed:', err);
-  });
+  return `
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:12px;min-width:0;">
+      <div style="width:34px;height:34px;border-radius:8px;background:rgba(79,142,247,0.1);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">
+        <i class="${icon}"></i>
+      </div>
+      <div style="min-width:0;flex:1;">
+        <div style="font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:2px;">${esc(label)}</div>
+        <div style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${content}</div>
+      </div>
+    </div>
+  `;
 }
 
-function loadMemberUnits(districtId) {
-  const sel = document.getElementById('memberUnit');
-
-  if (!districtId) {
-    sel.innerHTML = '<option value="">Select District First</option>';
-    return;
-  }
-
-  sel.innerHTML = '<option value="">Loading...</option>';
-
-  fetch(`{{ url('/api/units') }}`, {
-    method: 'POST',
-    headers: {
-      'Accept': 'application/json',
-      'Content-Type': 'application/json',
-      'X-CSRF-TOKEN': '{{ csrf_token() }}'
-    },
-    body: JSON.stringify({ district_id: districtId })
-  })
-  .then(r => r.json())
-  .then(data => {
-    sel.innerHTML = '<option value="">Select Unit</option>';
-    if (data.data && data.data.length > 0) {
-      data.data.forEach(u => {
-        sel.innerHTML += `<option value="${u.id}">${esc(u.name)}</option>`;
-      });
-    } else {
-      sel.innerHTML = '<option value="">No units found</option>';
-    }
-  })
-  .catch(err => {
-    sel.innerHTML = '<option value="">Error loading units</option>';
-    console.error('Unit load failed:', err);
-  });
+function renderMemberFullTile(icon, label, value) {
+  const displayVal = (value !== null && value !== undefined && String(value).trim() !== '') ? String(value).trim() : '—';
+  return `
+    <div style="grid-column:1 / -1;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;display:flex;align-items:flex-start;gap:12px;">
+      <div style="width:34px;height:34px;border-radius:8px;background:rgba(79,142,247,0.1);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;margin-top:2px;">
+        <i class="${icon}"></i>
+      </div>
+      <div style="min-width:0;flex:1;">
+        <div style="font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:3px;">${esc(label)}</div>
+        <div style="font-size:13px;font-weight:500;color:var(--text);white-space:pre-line;line-height:1.5;">${esc(displayVal)}</div>
+      </div>
+    </div>
+  `;
 }
 
-// ── VIEW MEMBER (address spans the full row) ──
+// ── VIEW MEMBER DETAILS ──
 function viewMember(id) {
-  document.getElementById('memberContent').innerHTML = 'Loading...';
+  document.getElementById('memberContent').innerHTML = `
+    <div style="text-align:center;padding:45px 20px;color:var(--text-dim);">
+      <i class="fas fa-spinner fa-spin" style="font-size:28px;color:var(--accent);margin-bottom:12px;display:block;"></i>
+      <span style="font-size:13px;font-weight:500;">Loading member profile...</span>
+    </div>
+  `;
+  document.getElementById('adminDownloadMemberBtn').href = `{{ url('/admin/members') }}/${id}/download`;
   om('viewMemberM');
 
   fetch(`{{ url('/admin/members') }}/${id}/detail`)
-    .then(r => r.json())
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    })
     .then(d => {
-      document.getElementById('memberContent').innerHTML = `
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
-          ${field('Name', d.name)}
-          ${field('Email', d.email)}
-          ${field('Phone', d.phone)}
-          ${field('Date of Birth', d.dob ? String(d.dob).slice(0, 10) : '')}
-          ${field('Shop Name', d.organization)}
-          ${field('Unit', d.unit_name)}
-          <div style="grid-column:1 / -1;">
-            ${field('Address', d.address)}
+      const initials = d.name ? d.name.trim().split(/\s+/).map(p => p[0]).slice(0, 2).join('').toUpperCase() : 'M';
+
+      const photoHtml = d.photo
+        ? `<img src="${esc(d.photo)}" alt="${esc(d.name)}" style="width:88px;height:88px;border-radius:14px;object-fit:cover;border:3px solid #fff;box-shadow:0 6px 18px rgba(0,0,0,0.12);flex-shrink:0;background:#fff;">`
+        : `<div style="width:88px;height:88px;border-radius:14px;background:linear-gradient(135deg, var(--accent, #4f8ef7), #7c3aed);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(79,142,247,0.25);border:3px solid #fff;flex-shrink:0;">
+            <span style="font-size:26px;font-weight:700;line-height:1;">${initials}</span>
+            <span style="font-size:9px;font-weight:600;opacity:0.85;margin-top:4px;letter-spacing:0.5px;">NO PHOTO</span>
+          </div>`;
+
+      let statusBadge = '';
+      const st = (d.status || '').toUpperCase();
+      if (st === 'ACTIVE') {
+        statusBadge = `<span class="badge bac" style="font-size:11px;padding:3px 9px;display:inline-flex;align-items:center;gap:4px;"><i class="fas fa-check-circle" style="font-size:10px;"></i>Active</span>`;
+      } else if (st === 'APPROVED') {
+        statusBadge = `<span class="badge bap" style="font-size:11px;padding:3px 9px;display:inline-flex;align-items:center;gap:4px;"><i class="fas fa-check" style="font-size:10px;"></i>Approved</span>`;
+      } else if (st === 'PENDING') {
+        statusBadge = `<span class="badge bpe" style="font-size:11px;padding:3px 9px;display:inline-flex;align-items:center;gap:4px;"><i class="fas fa-clock" style="font-size:10px;"></i>Pending</span>`;
+      } else if (st === 'REJECTED') {
+        statusBadge = `<span class="badge brj" style="font-size:11px;padding:3px 9px;display:inline-flex;align-items:center;gap:4px;"><i class="fas fa-times-circle" style="font-size:10px;"></i>Rejected</span>`;
+      } else {
+        statusBadge = `<span class="badge bex" style="font-size:11px;padding:3px 9px;">${esc(d.status || '—')}</span>`;
+      }
+
+      const memberNetBadge = d.is_fumma_member
+        ? `<span class="badge bap" style="font-size:11px;padding:3px 9px;display:inline-flex;align-items:center;gap:4px;"><i class="fas fa-shield-alt" style="font-size:10px;"></i>Member Net</span>`
+        : '';
+
+      let dobFormatted = '—';
+      if (d.dob) {
+        const dobStr = String(d.dob).slice(0, 10);
+        try {
+          const dobObj = new Date(dobStr);
+          if (!isNaN(dobObj.getTime())) {
+            dobFormatted = dobObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+          } else {
+            dobFormatted = dobStr;
+          }
+        } catch (e) {
+          dobFormatted = dobStr;
+        }
+      }
+
+      let schemesHtml = '';
+      const totalSchemes = d.total_schemes ?? (d.schemes ? d.schemes.length : 0);
+
+      if (d.schemes && d.schemes.length > 0) {
+        schemesHtml = `
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            ${d.schemes.map(s => `
+              <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:12px;">
+                <div style="min-width:0;flex:1;">
+                  <div style="font-weight:700;font-size:13.5px;color:var(--text);display:flex;align-items:center;gap:6px;">
+                    <i class="fas fa-hand-holding-usd" style="color:var(--accent);font-size:12px;"></i>
+                    ${esc(s.title)}
+                  </div>
+                  <div style="font-size:11.5px;color:var(--text-dim);margin-top:4px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+                    <span style="font-weight:600;color:var(--text);"><i class="fas fa-rupee-sign" style="font-size:10px;margin-right:2px;"></i>${Number(s.amount).toLocaleString('en-IN')}</span>
+                    <span style="opacity:0.4;">&bull;</span>
+                    <span><i class="far fa-clock" style="font-size:10px;margin-right:2px;"></i>${esc(s.duration_months)} Months</span>
+                    <span style="opacity:0.4;">&bull;</span>
+                    <span><i class="far fa-calendar-alt" style="font-size:10px;margin-right:2px;"></i>${esc(s.start_date)} to ${esc(s.end_date)}</span>
+                  </div>
+                </div>
+                <div>
+                  <span class="badge ${s.is_active ? 'bac' : 'bpe'}" style="font-size:10px;padding:3px 8px;">
+                    ${s.is_active ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
+              </div>
+            `).join('')}
           </div>
-          ${field('District', d.district_name)}
-          ${field('State', d.state_name)}
-          ${field('Membership ID', d.membership_id)}
-          ${field('Status', d.status)}
-          ${field('Joined Date', d.joined_date)}
-          ${field('Expiry Date', d.expiry_date)}
-          ${field('Registered On', d.registered_on)}
+        `;
+      } else {
+        schemesHtml = `
+          <div style="background:var(--card);border:1px dashed var(--border);border-radius:10px;padding:18px;text-align:center;color:var(--text-dim);font-size:12.5px;">
+            <i class="fas fa-layer-group" style="font-size:22px;opacity:0.35;display:block;margin-bottom:6px;"></i>
+            No schemes enrolled for this member.
+          </div>
+        `;
+      }
+
+      document.getElementById('memberContent').innerHTML = `
+        {{-- Hero Profile Banner --}}
+        <div style="background:linear-gradient(135deg, rgba(79,142,247,0.08) 0%, rgba(124,58,237,0.05) 100%);border:1px solid rgba(79,142,247,0.18);border-radius:14px;padding:18px 20px;display:flex;align-items:center;gap:18px;margin-bottom:18px;position:relative;overflow:hidden;">
+          <div style="position:absolute;right:-25px;top:-25px;width:130px;height:130px;background:radial-gradient(circle, rgba(79,142,247,0.15) 0%, transparent 70%);pointer-events:none;"></div>
+
+          ${photoHtml}
+
+          <div style="min-width:0;flex:1;">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+              <h3 style="margin:0;font-size:19px;font-weight:700;color:var(--text);letter-spacing:-0.2px;">${esc(d.name)}</h3>
+            </div>
+
+            <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px;">
+              <span style="display:inline-flex;align-items:center;gap:4px;background:rgba(79,142,247,0.12);color:var(--accent);border:1px solid rgba(79,142,247,0.25);padding:3px 9px;border-radius:6px;font-size:11.5px;font-weight:700;letter-spacing:0.3px;">
+                <i class="fas fa-hashtag" style="font-size:10px;"></i>${esc(d.membership_id || 'PENDING')}
+              </span>
+              ${statusBadge}
+              ${memberNetBadge}
+            </div>
+
+            <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;font-size:12px;color:var(--text-dim);">
+              <span style="display:flex;align-items:center;gap:4px;">
+                <i class="fas fa-store" style="color:var(--accent);font-size:11px;"></i>${esc(d.organization || 'Shop not specified')}
+              </span>
+              <span style="display:flex;align-items:center;gap:4px;">
+                <i class="fas fa-building" style="color:var(--accent);font-size:11px;"></i>${esc(d.unit_name || '—')}
+              </span>
+            </div>
+          </div>
         </div>
+
+        {{-- Section 1: Personal & Contact Information --}}
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--text-dim);margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+          <i class="fas fa-user-circle" style="color:var(--accent);"></i>Personal Information
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+          ${renderMemberTile('fas fa-phone', 'Phone Number', d.phone, true, `tel:${d.phone}`)}
+          ${renderMemberTile('fas fa-envelope', 'Email Address', d.email, true, `mailto:${d.email}`)}
+          ${renderMemberTile('fas fa-birthday-cake', 'Date of Birth', dobFormatted)}
+          ${renderMemberTile('fas fa-map-marker-alt', 'State', d.state_name || 'Kerala')}
+          ${renderMemberFullTile('fas fa-map-marked-alt', 'Full Address', d.address)}
+        </div>
+
+        {{-- Section 2: Membership & Business Information --}}
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--text-dim);margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+          <i class="fas fa-briefcase" style="color:var(--accent);"></i>Membership & Organization
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+          ${renderMemberTile('fas fa-store', 'Shop / Organization', d.organization)}
+          ${renderMemberTile('fas fa-building', 'Unit', d.unit_name)}
+          ${renderMemberTile('fas fa-id-card-alt', 'Membership Type', d.membership_type || 'ANNUAL')}
+          ${renderMemberTile('fas fa-calendar-check', 'Joined Date', d.joined_date)}
+          ${renderMemberTile('fas fa-hourglass-half', 'Expiry Date', d.expiry_date)}
+          ${renderMemberTile('fas fa-clock', 'Registered On', d.registered_on)}
+        </div>
+
+        {{-- Section 3: Schemes Breakdown --}}
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--text-dim);display:flex;align-items:center;gap:6px;">
+            <i class="fas fa-layer-group" style="color:var(--accent);"></i>Enrolled Schemes
+          </span>
+          <span class="badge" style="background:rgba(79,142,247,0.12);color:var(--accent);border:1px solid rgba(79,142,247,0.25);font-size:11px;padding:2px 8px;font-weight:700;">
+            ${totalSchemes} Scheme${totalSchemes === 1 ? '' : 's'}
+          </span>
+        </div>
+        ${schemesHtml}
       `;
     })
     .catch(err => {
-      document.getElementById('memberContent').innerHTML =
-        '<span style="color:var(--red);font-size:12px;">Failed to load member details</span>';
+      document.getElementById('memberContent').innerHTML = `
+        <div style="text-align:center;padding:35px 20px;color:var(--red);">
+          <i class="fas fa-exclamation-triangle" style="font-size:24px;margin-bottom:8px;display:block;"></i>
+          <span style="font-size:13px;font-weight:500;">Failed to load member details. Please try again.</span>
+        </div>
+      `;
       console.error('Member view failed:', err);
     });
 }

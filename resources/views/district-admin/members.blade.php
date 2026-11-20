@@ -68,7 +68,7 @@
             <th>Phone</th>
             <th>Unit</th>
             <th>Membership ID</th>
-            <th>FUMMA</th>
+            <th>Member Net</th>
             <th class="hide-mobile">Organization</th>
             <th>Status</th>
             <th class="hide-mobile">Registered</th>
@@ -99,7 +99,7 @@
                         <td style="color:var(--text-dim);white-space:nowrap;">{{ $m->membership_id ?? '—' }}</td>
             <td>
               @if($m->is_fumma_member)
-                <span class="badge bap">FUMMA</span>
+                <span class="badge bap">Member Net</span>
               @else
                 <span style="color:var(--text-dim);font-size:11px;">—</span>
               @endif

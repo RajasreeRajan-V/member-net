@@ -64,7 +64,8 @@
             <th>Row</th>
             <th>Name</th>
             <th>Email</th>
-            <th>FUMMA</th>
+            <th>Membership ID</th>
+            <th>Member Net</th>
             <th>Status</th>
           </tr>
         </thead>
@@ -78,15 +79,18 @@
             <td style="color:var(--text-dim)">
               {{ $s['email'] ?: '—' }}
             </td>
+            <td style="font-weight:600;color:var(--accent);">
+              {{ $s['membership_id'] ?? '—' }}
+            </td>
             <td>
               @if(!empty($s['is_fumma_member']))
-                <span class="badge bap">FUMMA</span>
+                <span class="badge bap">Member Net</span>
               @else
-                <span style="color:var(--text-dim);font-size:11px;">Non-FUMMA</span>
+                <span style="color:var(--text-dim);font-size:11px;">Non-Member Net</span>
               @endif
             </td>
             <td>
-              <span class="badge bap">Created</span>
+              <span class="badge bap">Approved</span>
             </td>
           </tr>
           @endforeach
@@ -215,72 +219,27 @@
   </div>
 </div>
 
-{{-- REFERENCE: STATES (hidden when Kerala is fixed) --}}
-@unless($fixedState)
-<div class="card" style="margin-bottom:18px;">
-  <div class="ch">
-    <div class="ct"><i class="fas fa-map"></i>Valid States (use exact name)</div>
-  </div>
-  <div class="tw">
-    <table>
-      <thead><tr><th>State</th></tr></thead>
-      <tbody>
-        @foreach(\App\Models\State::orderBy('name')->get() as $state)
-        <tr><td>{{ $state->name }}</td></tr>
-        @endforeach
-      </tbody>
-    </table>
-  </div>
-</div>
-@endunless
-
-{{-- REFERENCE: DISTRICT / UNIT --}}
+{{-- REFERENCE: UNITS --}}
 <div class="card" style="margin-bottom:18px;">
   <div class="ch">
     <div class="ct">
       <i class="fas fa-building"></i>
-      Districts & Units Reference
+      Units Reference
     </div>
-    @unless($fixedState)
-    <select id="stateFilter"
-            onchange="filterDistricts(this.value)"
-            style="padding:4px 10px;font-size:11px;
-                   border-radius:20px;
-                   border:1px solid var(--border);
-                   background:transparent;
-                   color:var(--text-dim);
-                   width:auto;cursor:pointer;">
-      <option value="">All States</option>
-      @foreach(\App\Models\State::orderBy('name')->get() as $state)
-      <option value="{{ $state->id }}">
-        {{ $state->name }}
-      </option>
-      @endforeach
-    </select>
-    @endunless
   </div>
   <div class="tw">
     <table>
       <thead>
         <tr>
-          @unless($fixedState)<th>State</th>@endunless
-          <th>District</th>
-          <th>Unit</th>
+          <th>Unit ID</th>
+          <th>Unit Name</th>
         </tr>
       </thead>
-      <tbody id="districtTable">
-        @foreach(
-          \App\Models\Unit::with('district.state')
-            ->when($fixedState, fn($q) => $q->whereHas('district', fn($d) => $d->where('state_id', $fixedState->id)))
-            ->get()
-            ->sortBy(fn($u) => $u->district->state->name.$u->district->name.$u->name)
-          as $unit)
-        <tr data-state="{{ $unit->district->state_id }}">
-          @unless($fixedState)
-            <td style="color:var(--text-dim);">{{ $unit->district->state->name }}</td>
-          @endunless
-          <td>{{ $unit->district->name }}</td>
-          <td>{{ $unit->name }}</td>
+      <tbody id="unitTable">
+        @foreach($units as $unit)
+        <tr>
+          <td><span class="utag">{{ str_pad($unit->id, 6, '0', STR_PAD_LEFT) }}</span></td>
+          <td style="font-weight:600;">{{ $unit->name }}</td>
         </tr>
         @endforeach
       </tbody>
@@ -345,9 +304,7 @@
           📋 CSV Column Order:
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:6px;">
-          @foreach(array_values(array_filter(
-    ['name','email (optional)','phone','dob (YYYY-MM-DD)','shop_name', $fixedState ? null : 'state','district','unit','address']
-)) as $i => $col)
+          @foreach(['name', 'email (optional)', 'phone', 'dob (YYYY-MM-DD)', 'shop_name', 'unit', 'address'] as $i => $col)
           <span style="background:rgba(79,142,247,0.1);
                        color:var(--accent-2);
                        padding:2px 8px;border-radius:4px;
@@ -367,16 +324,10 @@
         </div>
       </div>
 
-      {{-- NAME-MATCHING NOTE --}}
+      {{-- UNIT MATCHING NOTE --}}
       <div style="margin-top:10px;font-size:11px;color:var(--text-dim);">
         <i class="fas fa-info-circle" style="color:var(--accent)"></i>
-                @if($fixedState)
-          <b>District and unit</b> must be typed exactly as listed above, and the unit must belong to the district.
-          The <b>state</b> column is filled automatically with <b>{{ $fixedState->name }}</b>, so whatever you type there is ignored.
-        @else
-          <b>State, district and unit</b> must be typed as names exactly as listed above.
-          The district must belong to the state, and the unit to the district, otherwise the row is rejected.
-        @endif
+        <b>Unit</b> must be entered as either the <b>Unit Name</b> (e.g. <code>{{ $units->first()?->name ?? 'Vadakara' }}</code>) or its <b>6-digit Unit ID</b> (e.g. <code>{{ str_pad($units->first()?->id ?? 1, 6, '0', STR_PAD_LEFT) }}</code>) as listed in the reference table above.
       </div>
 
       {{-- ADDRESS NOTE --}}
@@ -391,11 +342,10 @@
                   justify-content:space-between;
                   align-items:center;flex-wrap:wrap;gap:8px;">
         <div style="font-size:11px;color:var(--text-dim);">
-          <i class="fas fa-info-circle"
-             style="color:var(--accent)"></i>
-          All imported members will have
-          <b style="color:var(--orange)">PENDING</b> status.
-          Unit Admin must approve each member.
+          <i class="fas fa-check-circle"
+             style="color:var(--green)"></i>
+          All imported members will be
+          <b style="color:var(--green)">AUTOMATICALLY APPROVED</b> with membership IDs generated.
         </div>
         <button type="submit" class="btn bp"
                 id="importBtn">
@@ -444,20 +394,6 @@ function handleDrop(e) {
   } else {
     alert('Please upload a .csv file!');
   }
-}
-
-function filterDistricts(stateId) {
-  const rows = document.querySelectorAll(
-    '#districtTable tr'
-  );
-  rows.forEach(row => {
-    if (!stateId ||
-        row.dataset.state == stateId) {
-      row.style.display = '';
-    } else {
-      row.style.display = 'none';
-    }
-  });
 }
 
 // Show loading on submit (targets this page's form specifically)

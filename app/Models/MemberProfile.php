@@ -29,7 +29,8 @@ class MemberProfile extends Model
     protected $attributes = [
         'membership_type' => 'ANNUAL',
         'membership_id'   => null,
-        'is_fumma_member' => 0, 
+        'is_fumma_member' => 0,
+        'state_id'        => 1,
     ];
    
    protected $casts = [
@@ -58,5 +59,10 @@ class MemberProfile extends Model
     public function state()
     {
         return $this->belongsTo(State::class, 'state_id');
+    }
+
+    public function schemes()
+    {
+        return $this->belongsToMany(Scheme::class, 'scheme_members', 'member_profile_id', 'scheme_id');
     }
 }

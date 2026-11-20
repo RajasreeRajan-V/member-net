@@ -15,7 +15,7 @@
     </div>
 
     <div class="tw">
-      <table>
+      <table style="min-width: 780px;">
         <thead>
           <tr>
             <th>#</th>

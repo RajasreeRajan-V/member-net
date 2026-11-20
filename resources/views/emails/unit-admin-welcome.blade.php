@@ -32,16 +32,30 @@
                                    style="background:#f9fafb;border:1px solid #e5e7eb;
                                           border-radius:6px;margin-bottom:18px;">
                                 <tr>
-                                    <td style="padding:14px 16px;font-size:13px;color:#6b7280;">Email</td>
-                                    <td style="padding:14px 16px;font-size:13px;font-weight:700;
+                                    <td style="padding:14px 16px;font-size:13px;color:#6b7280;">Username (6-Digit Unit ID)</td>
+                                    <td style="padding:14px 16px;font-size:15px;font-weight:700;
+                                               color:#1f2937;text-align:right;font-family:monospace;letter-spacing:1px;">
+                                        {{ str_pad($unitId, 6, '0', STR_PAD_LEFT) }}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding:0 16px 14px;font-size:13px;color:#6b7280;">Unit Name</td>
+                                    <td style="padding:0 16px 14px;font-size:13px;font-weight:600;
+                                               color:#1f2937;text-align:right;">
+                                        {{ $unitName }}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding:0 16px 14px;font-size:13px;color:#6b7280;">Email</td>
+                                    <td style="padding:0 16px 14px;font-size:13px;font-weight:600;
                                                color:#1f2937;text-align:right;">
                                         {{ $email }}
                                     </td>
                                 </tr>
                                 <tr>
-                                    <td style="padding:0 16px 14px;font-size:13px;color:#6b7280;">Password</td>
-                                    <td style="padding:0 16px 14px;font-size:13px;font-weight:700;
-                                               color:#1f2937;text-align:right;">
+                                    <td style="padding:0 16px 14px;font-size:13px;color:#6b7280;">Password (Phone Number)</td>
+                                    <td style="padding:0 16px 14px;font-size:15px;font-weight:700;
+                                               color:#1f2937;text-align:right;font-family:monospace;letter-spacing:1px;">
                                         {{ $password }}
                                     </td>
                                 </tr>

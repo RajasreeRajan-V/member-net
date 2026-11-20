@@ -342,6 +342,26 @@ public function storeUnit(Request $request)
 
     public function storeUnitAdmin(Request $request)
     {
+        // ── Purge any obsolete district_admin or trashed user holding this email or phone ──
+        $inputEmail = trim(strtolower($request->email ?? ''));
+        $inputPhone = trim($request->phone ?? '');
+
+        if ($inputEmail) {
+            $conflicting = User::withTrashed()->where('email', $inputEmail)->first();
+            if ($conflicting && ($conflicting->trashed() || $conflicting->role === 'district_admin')) {
+                \Illuminate\Support\Facades\DB::table('district_admins')->where('user_id', $conflicting->id)->delete();
+                $conflicting->forceDelete();
+            }
+        }
+
+        if ($inputPhone) {
+            $conflictingPhone = User::withTrashed()->where('phone', $inputPhone)->first();
+            if ($conflictingPhone && ($conflictingPhone->trashed() || $conflictingPhone->role === 'district_admin')) {
+                \Illuminate\Support\Facades\DB::table('district_admins')->where('user_id', $conflictingPhone->id)->delete();
+                $conflictingPhone->forceDelete();
+            }
+        }
+
         // ── 'dns' rule blocks junk domains (e.g. "gmailsdnl") at entry time,
         //    the same protection applied to member emails below. ──
         $request->validate([
@@ -378,8 +398,7 @@ public function storeUnit(Request $request)
             return back()->with('error', 'This unit already has an admin!');
         }
 
-        $firstName = preg_replace('/[^A-Za-z0-9]/', '', explode(' ', trim($request->name))[0]) ?: 'Admin';
-        $password  = $firstName . '@' . rand(1000, 9999);
+        $password = trim($request->phone);
 
         $user = User::create([
             'name'      => trim($request->name),
@@ -399,6 +418,7 @@ public function storeUnit(Request $request)
         // ── Send credentials email (wrapped so a bad address can't 500 this action) ──
         try {
             $unit = Unit::with('district')->find($request->unit_id);
+            $unitCode = str_pad($unit->id, 6, '0', STR_PAD_LEFT);
 
             Mail::to($user->email)->send(new \App\Mail\UnitAdminWelcomeMail(
                 adminName:    $user->name,
@@ -406,25 +426,50 @@ public function storeUnit(Request $request)
                 password:     $password,
                 unitName:     $unit->name,
                 districtName: $unit->district->name,
+                unitId:       $unitCode,
             ));
 
             return back()->with(
                 'success',
-                'Unit Admin created! Password: ' . $password . ' (also emailed to ' . $user->email . ')'
+                'Successfully created the account and sent the email ID and password.'
             );
         } catch (\Exception $e) {
             Log::error('Unit Admin welcome email failed: ' . $e->getMessage());
 
             return back()->with(
                 'success',
-                'Unit Admin created! Password: ' . $password .
-                ' (Could not send the credentials email to ' . $user->email . ' — please share the password manually.)'
+                'Successfully created the account, but could not send the credentials email to ' . $user->email .
+                ' (Password: ' . $password . ' — please share the password manually).'
             );
         }
     }
 
     public function updateUnitAdmin(Request $request)
     {
+        $currentUserId = UnitAdmin::find($request->id)?->user_id;
+        $inputEmail = trim(strtolower($request->email ?? ''));
+        $inputPhone = trim($request->phone ?? '');
+
+        if ($inputEmail) {
+            $conflicting = User::withTrashed()->where('email', $inputEmail)
+                ->when($currentUserId, fn($q) => $q->where('id', '!=', $currentUserId))
+                ->first();
+            if ($conflicting && ($conflicting->trashed() || $conflicting->role === 'district_admin')) {
+                \Illuminate\Support\Facades\DB::table('district_admins')->where('user_id', $conflicting->id)->delete();
+                $conflicting->forceDelete();
+            }
+        }
+
+        if ($inputPhone) {
+            $conflictingPhone = User::withTrashed()->where('phone', $inputPhone)
+                ->when($currentUserId, fn($q) => $q->where('id', '!=', $currentUserId))
+                ->first();
+            if ($conflictingPhone && ($conflictingPhone->trashed() || $conflictingPhone->role === 'district_admin')) {
+                \Illuminate\Support\Facades\DB::table('district_admins')->where('user_id', $conflictingPhone->id)->delete();
+                $conflictingPhone->forceDelete();
+            }
+        }
+
         $request->validate([
             'id'      => 'required|exists:unit_admins,id',
             'name'    => [
@@ -489,8 +534,7 @@ public function storeUnit(Request $request)
         // fresh password, same as the "Reset Password" action.
         $newPassword = null;
         if ($emailChanged || $request->boolean('resend_email')) {
-            $firstName   = explode(' ', $request->name)[0];
-            $newPassword = $firstName . '@' . rand(1000, 9999);
+            $newPassword = trim($request->phone);
             $user->password = $newPassword;
         }
 
@@ -504,6 +548,7 @@ public function storeUnit(Request $request)
         if ($newPassword) {
             try {
                 $unit = Unit::with('district')->find($request->unit_id);
+                $unitCode = str_pad($unit->id, 6, '0', STR_PAD_LEFT);
 
                 Mail::to($user->email)->send(new \App\Mail\UnitAdminWelcomeMail(
                     adminName:    $user->name,
@@ -511,6 +556,7 @@ public function storeUnit(Request $request)
                     password:     $newPassword,
                     unitName:     $unit->name,
                     districtName: $unit->district->name,
+                    unitId:       $unitCode,
                 ));
 
                 $message .= ' New login credentials sent to ' . $user->email
@@ -532,14 +578,29 @@ public function storeUnit(Request $request)
 
         $unitAdmin = UnitAdmin::find($request->id);
         $user = User::find($unitAdmin->user_id);
-        $firstName = explode(' ', $user->name)[0];
-        $newPassword = $firstName . '@' . rand(1000, 9999);
+        $newPassword = $user->phone;
         $user->password = $newPassword;
         $user->save();
 
+        try {
+            $unit = Unit::with('district')->find($unitAdmin->unit_id);
+            $unitCode = str_pad($unit->id, 6, '0', STR_PAD_LEFT);
+
+            Mail::to($user->email)->send(new \App\Mail\UnitAdminWelcomeMail(
+                adminName:    $user->name,
+                email:        $user->email,
+                password:     $newPassword,
+                unitName:     $unit->name,
+                districtName: $unit->district->name,
+                unitId:       $unitCode,
+            ));
+        } catch (\Exception $e) {
+            Log::error('Unit Admin reset password email failed: ' . $e->getMessage());
+        }
+
         return back()->with(
             'success',
-            'Password reset! New password: ' . $newPassword
+            'Password reset! Login credentials sent to ' . $user->email . ' (Username: ' . str_pad($unitAdmin->unit_id, 6, '0', STR_PAD_LEFT) . ', Password: ' . $newPassword . ').'
         );
     }
 
@@ -592,7 +653,7 @@ public function storeUnit(Request $request)
         $unitAdmin->delete();
         if ($user) {
             $user->tokens()->delete(); // log them out of every device
-            $user->delete();
+            $user->forceDelete(); // Permanently remove so email and phone are freed
         }
     });
 
@@ -868,40 +929,59 @@ public function storeUnit(Request $request)
 }
 
     public function members(Request $request)
-{
-    $fixed = State::fixed();
+    {
+        $query = MemberProfile::with(['user', 'unit', 'district', 'state']);
 
-    $query = MemberProfile::with(['user', 'unit', 'district', 'state']);
+        if ($request->filled('search')) {
+            $search = trim($request->search);
+            $query->where(function ($q) use ($search) {
+                $q->where('membership_id', 'LIKE', "%{$search}%")
+                  ->orWhereHas('user', function ($uq) use ($search) {
+                      $uq->where('phone', 'LIKE', "%{$search}%")
+                         ->orWhere('name', 'LIKE', "%{$search}%");
+                  });
+            });
+        }
 
-    if ($request->filled('status')) {
-        $query->where('status', $request->status);
-    }
-    if ($request->filled('district_id')) {
-        $query->where('district_id', $request->district_id);
-    }
-    if ($request->filled('membership_type')) {
-        $query->where('membership_type', $request->membership_type);
-    }
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+        if ($request->filled('unit_id')) {
+            $query->where('unit_id', $request->unit_id);
+        }
+        if ($request->filled('membership_type')) {
+            $query->where('membership_type', $request->membership_type);
+        }
 
-    return view('admin.members', [
-        'members' => $query->latest()->paginate(20),
-        'districts' => $fixed
-            ? District::where('state_id', $fixed->id)->orderBy('name')->get()
-            : District::all(),
-        'states' => State::all(),
-        'fixedState' => $fixed,
-        'status' => $request->status,
-        'district_id' => $request->district_id,
-        'membership_type' => $request->membership_type,
-    ]);
-}
+        return view('admin.members', [
+            'members'         => $query->latest()->paginate(20),
+            'units'           => Unit::where('is_active', true)->orderBy('name')->get(),
+            'status'          => $request->status,
+            'unit_id'         => $request->unit_id,
+            'membership_type' => $request->membership_type,
+            'search'          => $request->search,
+        ]);
+    }
 
     public function storeMember(Request $request)
     {
-        // Force Kerala, whatever the form sends
-if ($fixed = State::fixed()) {
-    $request->merge(['state_id' => $fixed->id]);
-}
+        // ── Purge soft-deleted/conflicting accounts with this email or phone ──
+        $inputEmail = trim(strtolower($request->email ?? ''));
+        $inputPhone = trim($request->phone ?? '');
+
+        if ($inputEmail) {
+            $conflicting = User::withTrashed()->where('email', $inputEmail)->first();
+            if ($conflicting && $conflicting->trashed()) {
+                $conflicting->forceDelete();
+            }
+        }
+
+        if ($inputPhone) {
+            $conflictingPhone = User::withTrashed()->where('phone', $inputPhone)->first();
+            if ($conflictingPhone && $conflictingPhone->trashed()) {
+                $conflictingPhone->forceDelete();
+            }
+        }
 
         $request->validate([
             'name'         => [
@@ -926,29 +1006,32 @@ if ($fixed = State::fixed()) {
             'dob'          => ['required', 'date', 'before:today', new MinimumAge(18)],
             'organization' => 'required|string|max:150',
             'address'      => 'required|string|max:500',
-            'state_id'     => 'required|exists:states,id',
-            'district_id'  => 'required|exists:districts,id',
             'unit_id'      => 'required|exists:units,id',
             'photo'        => 'required|image|mimes:jpg,jpeg,png|max:2048',
         ], [
-            'name.max'         => 'Name cannot exceed 100 characters.',
-            'name.regex'       => 'Name can only contain letters, spaces, hyphens and apostrophes.',
-            'email.email'      => 'Enter a valid email address.',
-            'email.dns'        => 'This email domain does not appear to accept mail. Please check for typos.',
-            'email.max'        => 'Email cannot exceed 150 characters.',
-            'email.regex'      => 'Email must include a valid domain (e.g. name@example.com).',
-            'email.unique'     => 'This email is already registered.',
-            'phone.regex'      => 'Enter a valid 10-digit Indian phone number.',
-            'phone.unique'     => 'This phone number is already used.',
+            'name.max'              => 'Name cannot exceed 100 characters.',
+            'name.regex'            => 'Name can only contain letters, spaces, hyphens and apostrophes.',
+            'email.email'           => 'Enter a valid email address.',
+            'email.dns'             => 'This email domain does not appear to accept mail. Please check for typos.',
+            'email.max'             => 'Email cannot exceed 150 characters.',
+            'email.regex'           => 'Email must include a valid domain (e.g. name@example.com).',
+            'email.unique'          => 'This email is already registered.',
+            'phone.regex'           => 'Enter a valid 10-digit Indian phone number.',
+            'phone.unique'          => 'This phone number is already used.',
             'organization.required' => 'Shop name is required.',
             'organization.max'      => 'Shop name cannot exceed 150 characters.',
-            'address.required' => 'Address is required.',
-            'address.max'      => 'Address cannot exceed 500 characters.',
-            'photo.required' => 'Member photo is required.',
-            'photo.image'    => 'The file must be an image (jpg, jpeg or png).',
-            'photo.mimes'    => 'Photo must be a jpg, jpeg or png file.',
-            'photo.max'      => 'Photo cannot exceed 2MB.',
+            'address.required'      => 'Address is required.',
+            'address.max'           => 'Address cannot exceed 500 characters.',
+            'unit_id.required'      => 'Unit is required.',
+            'unit_id.exists'        => 'Selected unit is invalid.',
+            'photo.required'        => 'Member photo is required.',
+            'photo.image'           => 'The file must be an image (jpg, jpeg or png).',
+            'photo.mimes'           => 'Photo must be a jpg, jpeg or png file.',
+            'photo.max'             => 'Photo cannot exceed 2MB.',
         ]);
+
+        $unit    = Unit::findOrFail($request->unit_id);
+        $stateId = State::fixed()?->id ?? 1;
 
         // Email is optional: always store NULL (never '') so the unique index is safe
         $email = trim((string) $request->email) !== '' ? trim($request->email) : null;
@@ -967,7 +1050,7 @@ if ($fixed = State::fixed()) {
 
         // ── Create user + profile + approve, all atomically ──
         try {
-            $profile = \Illuminate\Support\Facades\DB::transaction(function () use ($request, $photoPath, $email, $isFummaMember) {
+            $profile = \Illuminate\Support\Facades\DB::transaction(function () use ($request, $unit, $stateId, $photoPath, $email, $isFummaMember) {
                 $user = User::create([
                     'name'      => $request->name,
                     'email'     => $email,
@@ -979,9 +1062,8 @@ if ($fixed = State::fixed()) {
 
                 $profile = MemberProfile::create([
                     'user_id'         => $user->id,
-                    'unit_id'         => $request->unit_id,
-                    'district_id'     => $request->district_id,
-                    'state_id'        => $request->state_id,
+                    'unit_id'         => $unit->id,
+                    'state_id'        => $stateId,
                     'status'          => 'PENDING',
                     'dob'             => $request->dob,
                     'organization'    => $request->organization,
@@ -1027,7 +1109,7 @@ if ($fixed = State::fixed()) {
             }
         }
 
-        $fummaNote = $isFummaMember ? ' FUMMA member: Yes.' : ' FUMMA member: No.';
+        $fummaNote = $isFummaMember ? ' Member Net: Yes.' : ' Member Net: No.';
 
         return back()->with(
             'success',
@@ -1099,24 +1181,117 @@ public function updateMember(Request $request)
 
     public function memberDetail($id)
     {
-        $member = MemberProfile::with(['user', 'unit', 'district', 'state'])->find($id);
+        $member = MemberProfile::with(['user', 'unit', 'state', 'schemes'])->find($id);
+
+        if (!$member) {
+            return response()->json(['error' => 'Member not found'], 404);
+        }
+
+        $schemes = $member->schemes->map(function ($s) {
+            return [
+                'id'              => $s->id,
+                'title'           => $s->title,
+                'amount'          => (float) $s->amount,
+                'duration_months' => $s->duration_months,
+                'start_date'      => $s->start_date ? $s->start_date->format('d M Y') : '—',
+                'end_date'        => $s->end_date ? $s->end_date->format('d M Y') : '—',
+                'is_active'       => (bool) $s->is_active,
+            ];
+        });
+
+        $joinedDate = $member->joined_date
+            ? (is_string($member->joined_date) ? date('d M Y', strtotime($member->joined_date)) : $member->joined_date->format('d M Y'))
+            : '—';
+        $expiryDate = $member->expiry_date
+            ? (is_string($member->expiry_date) ? date('d M Y', strtotime($member->expiry_date)) : $member->expiry_date->format('d M Y'))
+            : '—';
 
         return response()->json([
-            'name'          => $member->user->name,
-            'email'         => $member->user->email,
-            'phone'         => $member->user->phone,
-            'dob'           => $member->dob,
-            'organization'  => $member->organization,
-            'address'       => $member->address,
-            'photo'         => $member->photo ? asset('storage/' . $member->photo) : null,
-            'unit_name'     => $member->unit->name,
-            'district_name' => $member->district->name,
-            'state_name'    => $member->state->name,
-            'membership_id' => $member->membership_id ?? '—',
-            'status'        => $member->status,
-            'joined_date'   => $member->joined_date ?? '—',
-            'expiry_date'   => $member->expiry_date ?? '—',
-            'registered_on' => $member->created_at->format('d M Y'),
+            'id'              => $member->id,
+            'name'            => $member->user->name ?? '—',
+            'email'           => $member->user->email ?? '—',
+            'phone'           => $member->user->phone ?? '—',
+            'dob'             => $member->dob,
+            'organization'    => $member->organization,
+            'address'         => $member->address,
+            'photo'           => $member->photo ? asset('storage/' . $member->photo) : null,
+            'unit_name'       => $member->unit->name ?? '—',
+            'state_name'      => $member->state->name ?? 'Kerala',
+            'membership_id'   => $member->membership_id ?? '—',
+            'membership_type' => $member->membership_type ?? 'ANNUAL',
+            'is_fumma_member' => (bool) $member->is_fumma_member,
+            'status'          => $member->status,
+            'joined_date'     => $joinedDate,
+            'expiry_date'     => $expiryDate,
+            'registered_on'   => $member->created_at ? $member->created_at->format('d M Y') : '—',
+            'total_schemes'   => $schemes->count(),
+            'schemes'         => $schemes,
+        ]);
+    }
+
+    public function downloadMemberDetail($id)
+    {
+        $member = MemberProfile::with(['user', 'unit', 'state', 'schemes'])->findOrFail($id);
+
+        $safeName = preg_replace('/[^A-Za-z0-9_\-]/', '_', $member->membership_id ?: ($member->user->name ?? 'member'));
+        $filename = 'member_' . strtolower($safeName) . '_details.xls';
+
+        $content = view('exports.member-single-excel', compact('member'))->render();
+
+        return response($content, 200, [
+            'Content-Type'        => 'application/vnd.ms-excel; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            'Cache-Control'       => 'max-age=0',
+        ]);
+    }
+
+    public function downloadMembers(Request $request)
+    {
+        $query = MemberProfile::with(['user', 'unit', 'state', 'schemes']);
+
+        $scopeParts = [];
+        if ($request->filled('search')) {
+            $search = trim($request->search);
+            $query->where(function ($q) use ($search) {
+                $q->where('membership_id', 'LIKE', "%{$search}%")
+                  ->orWhereHas('user', function ($uq) use ($search) {
+                      $uq->where('phone', 'LIKE', "%{$search}%")
+                         ->orWhere('name', 'LIKE', "%{$search}%");
+                  });
+            });
+            $scopeParts[] = 'Search: ' . $search;
+        }
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+            $scopeParts[] = 'Status: ' . ucfirst($request->status);
+        }
+        if ($request->filled('unit_id')) {
+            $query->where('unit_id', $request->unit_id);
+            $unit = \App\Models\Unit::find($request->unit_id);
+            if ($unit) {
+                $scopeParts[] = 'Unit: ' . $unit->name;
+            }
+        }
+        if ($request->filled('membership_type')) {
+            $query->where('membership_type', $request->membership_type);
+            $scopeParts[] = 'Type: ' . $request->membership_type;
+        }
+
+        $members = $query->latest()->get();
+        $filename = 'members_directory_' . now()->format('d_M_Y') . '.xls';
+        $scopeDescription = count($scopeParts) > 0 ? implode(' | ', $scopeParts) : 'All Members';
+
+        $content = view('exports.members-excel', [
+            'title'            => 'Member Net - All Members Directory',
+            'members'          => $members,
+            'generatedAt'      => now()->format('d M Y, h:i A'),
+            'scopeDescription' => $scopeDescription,
+        ])->render();
+
+        return response($content, 200, [
+            'Content-Type'        => 'application/vnd.ms-excel; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            'Cache-Control'       => 'max-age=0',
         ]);
     }
 
@@ -1244,6 +1419,185 @@ public function updateMember(Request $request)
                 contactEmail: $unitAdminEmail,
                 loginUrl:     url('/login'),
             ));
+    }
+
+    // ─────────────────────────────────
+    // NON-MEMBERS (Third-Party)
+    // ─────────────────────────────────
+    public function nonMembers(Request $request)
+    {
+        $query = \App\Models\SchemeThirdPartyMember::with(['unit', 'schemes'])
+            ->withCount('schemes');
+
+        if ($request->filled('search')) {
+            $search = trim($request->search);
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'LIKE', "%{$search}%")
+                  ->orWhere('phone', 'LIKE', "%{$search}%")
+                  ->orWhere('email', 'LIKE', "%{$search}%")
+                  ->orWhere('organization', 'LIKE', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('unit_id')) {
+            $query->where('unit_id', $request->unit_id);
+        }
+
+        return view('admin.non-members', [
+            'nonMembers' => $query->latest()->paginate(20),
+            'units'      => \App\Models\Unit::where('is_active', true)->orderBy('name')->get(),
+            'schemes'    => \App\Models\Scheme::where('is_active', true)->orderBy('title')->get(),
+            'search'     => $request->search,
+            'unit_id'    => $request->unit_id,
+        ]);
+    }
+
+    public function storeNonMember(Request $request)
+    {
+        $request->validate([
+            'name'         => 'required|string|max:150',
+            'phone'        => 'required|string|max:20',
+            'email'        => 'nullable|email|max:150',
+            'dob'          => 'nullable|date',
+            'organization' => 'nullable|string|max:150',
+            'address'      => 'nullable|string|max:500',
+            'photo'        => 'nullable|image|max:2048',
+            'unit_id'      => 'nullable|exists:units,id',
+            'scheme_ids'   => 'nullable|array',
+            'scheme_ids.*' => 'exists:schemes,id',
+        ]);
+
+        $photoPath = null;
+        if ($request->hasFile('photo')) {
+            $photoPath = $request->file('photo')->store('third_party_photos', 'public');
+        }
+
+        $nonMember = \App\Models\SchemeThirdPartyMember::create([
+            'name'         => trim($request->name),
+            'phone'        => trim($request->phone),
+            'email'        => $request->filled('email') ? trim($request->email) : null,
+            'dob'          => $request->dob ?: null,
+            'organization' => $request->organization ?: null,
+            'address'      => $request->address ?: null,
+            'photo'        => $photoPath,
+            'unit_id'      => $request->unit_id ?: null,
+            'created_by'   => auth()->id(),
+        ]);
+
+        if ($request->filled('scheme_ids')) {
+            $nonMember->schemes()->sync($request->scheme_ids);
+            foreach ($request->scheme_ids as $schemeId) {
+                $scheme = \App\Models\Scheme::find($schemeId);
+                if ($scheme) {
+                    $this->generateThirdPartyDues($scheme, [$nonMember->id]);
+                }
+            }
+        }
+
+        return back()->with('success', "Non-member '{$nonMember->name}' created successfully!");
+    }
+
+    public function updateNonMember(Request $request)
+    {
+        $request->validate([
+            'id'           => 'required|exists:scheme_third_party_members,id',
+            'name'         => 'required|string|max:150',
+            'phone'        => 'required|string|max:20',
+            'email'        => 'nullable|email|max:150',
+            'dob'          => 'nullable|date',
+            'organization' => 'nullable|string|max:150',
+            'address'      => 'nullable|string|max:500',
+            'photo'        => 'nullable|image|max:2048',
+            'unit_id'      => 'nullable|exists:units,id',
+            'scheme_ids'   => 'nullable|array',
+            'scheme_ids.*' => 'exists:schemes,id',
+        ]);
+
+        $nonMember = \App\Models\SchemeThirdPartyMember::findOrFail($request->id);
+
+        $data = [
+            'name'         => trim($request->name),
+            'phone'        => trim($request->phone),
+            'email'        => $request->filled('email') ? trim($request->email) : null,
+            'dob'          => $request->dob ?: null,
+            'organization' => $request->organization ?: null,
+            'address'      => $request->address ?: null,
+            'unit_id'      => $request->unit_id ?: null,
+        ];
+
+        if ($request->hasFile('photo')) {
+            $data['photo'] = $request->file('photo')->store('third_party_photos', 'public');
+        }
+
+        $nonMember->update($data);
+
+        $schemeIds = $request->input('scheme_ids', []);
+        $nonMember->schemes()->sync($schemeIds);
+        foreach ($schemeIds as $schemeId) {
+            $scheme = \App\Models\Scheme::find($schemeId);
+            if ($scheme) {
+                $this->generateThirdPartyDues($scheme, [$nonMember->id]);
+            }
+        }
+
+        return back()->with('success', "Non-member '{$nonMember->name}' updated successfully!");
+    }
+
+    public function deleteNonMember(Request $request)
+    {
+        $request->validate(['id' => 'required|exists:scheme_third_party_members,id']);
+
+        $nonMember = \App\Models\SchemeThirdPartyMember::findOrFail($request->id);
+        $name = $nonMember->name;
+
+        // Cascade detach schemes and dues
+        $nonMember->schemes()->detach();
+        $nonMember->dues()->delete();
+        $nonMember->delete();
+
+        return back()->with('success', "Non-member '{$name}' deleted successfully!");
+    }
+
+    public function nonMemberDetail($id)
+    {
+        $nonMember = \App\Models\SchemeThirdPartyMember::with(['unit', 'schemes' => function ($q) {
+            $q->withCount(['dues as total_dues', 'dues as paid_dues' => fn($dq) => $dq->where('status', 'PAID')]);
+        }])->findOrFail($id);
+
+        $dues = \App\Models\SchemeFeeDue::with('scheme')
+            ->where('third_party_member_id', $nonMember->id)
+            ->get();
+
+        return response()->json([
+            'id'           => $nonMember->id,
+            'name'         => $nonMember->name,
+            'phone'        => $nonMember->phone,
+            'email'        => $nonMember->email ?: '—',
+            'dob'          => $nonMember->dob ? $nonMember->dob->format('Y-m-d') : null,
+            'dob_formatted'=> $nonMember->dob ? $nonMember->dob->format('d M Y') : '—',
+            'organization' => $nonMember->organization ?: '—',
+            'address'      => $nonMember->address ?: '—',
+            'unit_id'      => $nonMember->unit_id,
+            'unit_name'    => $nonMember->unit->name ?? '—',
+            'photo_url'    => $nonMember->photo ? asset('storage/' . $nonMember->photo) : null,
+            'created_at'   => $nonMember->created_at ? $nonMember->created_at->format('d M Y, h:i A') : '—',
+            'scheme_ids'   => $nonMember->schemes->pluck('id'),
+            'schemes'      => $nonMember->schemes->map(function ($s) use ($dues) {
+                $schemeDues = $dues->where('scheme_id', $s->id);
+                return [
+                    'id'          => $s->id,
+                    'title'       => $s->title,
+                    'amount'      => number_format((float)$s->amount, 2),
+                    'duration'    => $s->duration_months,
+                    'start_date'  => $s->start_date?->format('d M Y') ?? '—',
+                    'end_date'    => $s->end_date?->format('d M Y') ?? '—',
+                    'is_active'   => (bool)$s->is_active,
+                    'dues_count'  => $schemeDues->count(),
+                    'paid_count'  => $schemeDues->where('status', 'PAID')->count(),
+                    'total_paid'  => number_format((float)$schemeDues->where('status', 'PAID')->sum('amount'), 2),
+                ];
+            }),
+        ]);
     }
 
     // ─────────────────────────────────
@@ -1607,73 +1961,53 @@ public function updateMember(Request $request)
     // BULK IMPORT PAGE
     // ─────────────────────────────────
     public function bulkImport()
-{
-    $fixed = State::fixed();
+    {
+        $units = Unit::with('district')
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
 
-    return view('admin.bulk-import', [
-        'fixedState' => $fixed,
-        'states'     => State::all(),
-        'districts'  => District::all(),
-        'units'      => Unit::all(),
-    ]);
-}
-
-public function downloadTemplate()
-{
-    $headers = [
-        'Content-Type'        => 'text/csv',
-        'Content-Disposition' => 'attachment; filename="member_import_template.csv"',
-    ];
-
-    $fixed = State::fixed(); // Kerala, or null in multi-state mode
-
-    // The state column only exists in multi-state mode
-    $columns = ['sl_no', 'name', 'email', 'phone', 'dob', 'shop_name'];
-    if (!$fixed) {
-        $columns[] = 'state';
+        return view('admin.bulk-import', [
+            'units' => $units,
+        ]);
     }
-    array_push($columns, 'district', 'unit', 'address');
 
-    $unit     = Unit::with('district.state')
-        ->when($fixed, fn($q) => $q->whereHas('district', fn($d) => $d->where('state_id', $fixed->id)))
-        ->first();
-    $state    = $unit?->district?->state?->name ?? 'Kerala';
-    $district = $unit?->district?->name ?? 'Kozhikode';
-    $unitName = $unit?->name ?? 'Vadakara';
+    public function downloadTemplate()
+    {
+        $headers = [
+            'Content-Type'        => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="member_import_template.csv"',
+        ];
 
-    // Builds one sample row, adding the state cell only when needed
-    $makeRow = function ($name, $email, $phone, $dob, $shop, $address) use ($fixed, $state, $district, $unitName) {
-        $row = [$name, $email, $phone, $dob, $shop];
-        if (!$fixed) {
-            $row[] = $state;
-        }
-        return array_merge($row, [$district, $unitName, $address]);
-    };
+        $columns = ['sl_no', 'name', 'email', 'phone', 'dob', 'shop_name', 'unit', 'address'];
 
-    // Rows 1-2 are examples (delete or overwrite them); the rest are blank numbered rows.
-    $samples = [
-        1 => $makeRow('Fathima Beevi', 'fathima.sample1@gmail.com', '9845001001', '1990-05-15', 'Fathima Stores', 'Main Road, Vadakara'),
-        2 => $makeRow('Suresh Kumar',  '',                          '9845001002', '1985-08-20', 'Suresh Traders', 'Market Street, Vadakara'),
-    ];
+        $sampleUnit = Unit::where('is_active', true)->first();
+        $unitName   = $sampleUnit?->name ?? 'Vadakara';
 
-    $blankCells = count($columns) - 1; // everything except sl_no
+        // Rows 1-2 are examples (delete or overwrite them); the rest are blank numbered rows.
+        $samples = [
+            1 => ['Fathima Beevi', 'fathima.sample1@gmail.com', '9845001001', '1990-05-15', 'Fathima Stores', $unitName, 'Main Road, Vadakara'],
+            2 => ['Suresh Kumar',  '',                          '9845001002', '1985-08-20', 'Suresh Traders', $unitName, 'Market Street, Vadakara'],
+        ];
 
-    $callback = function () use ($columns, $samples, $blankCells) {
-        $file = fopen('php://output', 'w');
-        fputcsv($file, $columns);
-        for ($i = 1; $i <= 30; $i++) {
-            fputcsv($file, array_merge([$i], $samples[$i] ?? array_fill(0, $blankCells, '')));
-        }
-        fclose($file);
-    };
+        $blankCells = count($columns) - 1; // everything except sl_no
 
-    return response()->stream($callback, 200, $headers);
-}
+        $callback = function () use ($columns, $samples, $blankCells) {
+            $file = fopen('php://output', 'w');
+            fputcsv($file, $columns);
+            for ($i = 1; $i <= 30; $i++) {
+                fputcsv($file, array_merge([$i], $samples[$i] ?? array_fill(0, $blankCells, '')));
+            }
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
 
     // ─────────────────────────────────
     // PROCESS BULK IMPORT
     // ─────────────────────────────────
-        public function processBulkImport(Request $request)
+    public function processBulkImport(Request $request)
     {
         // Up to ~30 rows, each may call the FUMMA API (8s timeout max), so allow enough time.
         set_time_limit(300);
@@ -1692,12 +2026,26 @@ public function downloadTemplate()
         $header      = fgetcsv($handle);
         $firstHeader = strtolower(trim(preg_replace('/^\xEF\xBB\xBF/', '', $header[0] ?? '')));
         $offset      = in_array($firstHeader, ['sl_no', 'sl no', 'slno', 's.no', 'sno', 'serial', 'serial_no']) ? 1 : 0;
-                // Does this CSV have a "state" column? (new template: no, old template: yes)
+
         $headerNames = array_map(
             fn($h) => strtolower(trim(preg_replace('/^\xEF\xBB\xBF/', '', (string) $h))),
             array_slice($header, $offset)
         );
-        $hasStateCol = in_array('state', $headerNames);
+
+        $hasDistrictCol = in_array('district', $headerNames);
+        $hasStateCol    = in_array('state', $headerNames);
+
+        $colMap = [];
+        foreach ($headerNames as $idx => $hName) {
+            $cleaned = str_replace([' ', '_', '-'], '', $hName);
+            if (in_array($cleaned, ['name', 'fullname', 'membername'])) $colMap['name'] = $idx;
+            elseif (in_array($cleaned, ['email', 'emailid', 'emailaddress'])) $colMap['email'] = $idx;
+            elseif (in_array($cleaned, ['phone', 'phoneno', 'phonenumber', 'mobile', 'mobileno'])) $colMap['phone'] = $idx;
+            elseif (in_array($cleaned, ['dob', 'dateofbirth', 'birthdate'])) $colMap['dob'] = $idx;
+            elseif (in_array($cleaned, ['shopname', 'shop', 'organization', 'org'])) $colMap['shop_name'] = $idx;
+            elseif (in_array($cleaned, ['unit', 'unitname', 'unitid'])) $colMap['unit'] = $idx;
+            elseif (in_array($cleaned, ['address'])) $colMap['address'] = $idx;
+        }
 
         $results = [
             'success' => [], 'errors' => [],
@@ -1718,25 +2066,46 @@ public function downloadTemplate()
 
             $results['total']++;
 
-                        // Columns after "shop_name" shift left by one when there is no state column
-            $c = $hasStateCol ? 6 : 5;
+            if (isset($colMap['name'])) {
+                $data = [
+                    'name'      => trim($cells[$colMap['name'] ?? 0] ?? ''),
+                    'email'     => trim($cells[$colMap['email'] ?? 1] ?? ''),
+                    'phone'     => trim($cells[$colMap['phone'] ?? 2] ?? ''),
+                    'dob'       => trim($cells[$colMap['dob'] ?? 3] ?? ''),
+                    'shop_name' => trim($cells[$colMap['shop_name'] ?? 4] ?? ''),
+                    'unit'      => trim($cells[$colMap['unit'] ?? 5] ?? ''),
+                    'address'   => trim($cells[$colMap['address'] ?? 6] ?? ''),
+                ];
+            } else {
+                // Positional fallback
+                if ($hasDistrictCol) {
+                    $c = $hasStateCol ? 6 : 5;
+                    $data = [
+                        'name'      => trim($cells[0] ?? ''),
+                        'email'     => trim($cells[1] ?? ''),
+                        'phone'     => trim($cells[2] ?? ''),
+                        'dob'       => trim($cells[3] ?? ''),
+                        'shop_name' => trim($cells[4] ?? ''),
+                        'unit'      => trim($cells[$c + 1] ?? ''),
+                        'address'   => trim($cells[$c + 2] ?? ''),
+                    ];
+                } else {
+                    $data = [
+                        'name'      => trim($cells[0] ?? ''),
+                        'email'     => trim($cells[1] ?? ''),
+                        'phone'     => trim($cells[2] ?? ''),
+                        'dob'       => trim($cells[3] ?? ''),
+                        'shop_name' => trim($cells[4] ?? ''),
+                        'unit'      => trim($cells[5] ?? ''),
+                        'address'   => trim($cells[6] ?? ''),
+                    ];
+                }
+            }
 
-            $data = [
-                'name'      => trim($cells[0] ?? ''),
-                'email'     => trim($cells[1] ?? ''),
-                'phone'     => trim($cells[2] ?? ''),
-                'dob'       => trim($cells[3] ?? ''),
-                'shop_name' => trim($cells[4] ?? ''),
-                'state'     => $hasStateCol ? trim($cells[5] ?? '') : '',
-                'district'  => trim($cells[$c] ?? ''),
-                'unit'      => trim($cells[$c + 1] ?? ''),
-                'taluk'     => trim($cells[$c + 1] ?? ''),
-                'address'   => trim($cells[$c + 2] ?? ''),
-            ];
-            
-                        // Kerala is fixed: ignore whatever is typed in the CSV state column
-            if ($fixed = State::fixed()) {
-                $data['state'] = $fixed->name;
+            // Skip numbered blank rows (e.g. template placeholder rows: 5,,,,,,,)
+            if ($data['name'] === '' && $data['phone'] === '' && $data['unit'] === '') {
+                $results['total']--;
+                continue;
             }
 
             $errors = [];
@@ -1771,7 +2140,7 @@ public function downloadTemplate()
                     $errors[] = 'Email domain does not appear to accept mail (check for typos)';
                 }
 
-                if (User::withTrashed()->where('email', $email)->exists()) {
+                if (User::where('email', $email)->exists()) {
                     $errors[] = 'Email already exists';
                 }
             }
@@ -1779,7 +2148,7 @@ public function downloadTemplate()
             // ── Phone ──
             if (empty($data['phone']) || strlen($data['phone']) != 10) $errors[] = 'Phone must be 10 digits';
             if (!preg_match('/^[6-9]\d{9}$/', $data['phone']))         $errors[] = 'Phone must start with 6-9';
-            if (!empty($data['phone']) && User::withTrashed()->where('phone', $data['phone'])->exists()) {
+            if (!empty($data['phone']) && User::where('phone', $data['phone'])->exists()) {
                 $errors[] = 'Phone already exists';
             }
 
@@ -1808,38 +2177,44 @@ public function downloadTemplate()
             if (empty($data['address']))          $errors[] = 'Address is required';
             if (strlen($data['address']) > 500)   $errors[] = 'Address cannot exceed 500 characters';
 
-            // ── State → District → Unit ──
-            $stateModel = $districtModel = $unitModel = null;
-
-            if (empty($data['state'])) {
-                $errors[] = 'State is required';
-            } else {
-                $stateModel = State::whereRaw('LOWER(TRIM(name)) = ?', [$norm($data['state'])])->first();
-                if (!$stateModel) {
-                    $errors[] = "State '{$data['state']}' not found";
-                }
-            }
-
-            if (empty($data['district'])) {
-                $errors[] = 'District is required';
-            } elseif ($stateModel) {
-                $districtModel = District::where('state_id', $stateModel->id)
-                    ->whereRaw('LOWER(TRIM(name)) = ?', [$norm($data['district'])])
-                    ->first();
-                if (!$districtModel) {
-                    $errors[] = "District '{$data['district']}' not found in state '{$stateModel->name}'";
-                }
-            }
-
-            $unitInput = !empty($data['unit']) ? $data['unit'] : ($data['taluk'] ?? '');
+            // ── Unit (matched by 6-digit Unit ID, Unit name, or close typo like Avluva -> Aluva) ──
+            $unitModel = null;
+            $unitInput = trim($data['unit'] ?? '');
             if (empty($unitInput)) {
                 $errors[] = 'Unit is required';
-            } elseif ($districtModel) {
-                $unitModel = Unit::where('district_id', $districtModel->id)
-                    ->whereRaw('LOWER(TRIM(name)) = ?', [$norm($unitInput)])
-                    ->first();
+            } else {
+                if (is_numeric($unitInput)) {
+                    $unitModel = Unit::with('district')->find((int) $unitInput);
+                }
                 if (!$unitModel) {
-                    $errors[] = "Unit '{$unitInput}' not found in district '{$districtModel->name}'";
+                    $unitModel = Unit::with('district')
+                        ->whereRaw('LOWER(TRIM(name)) = ?', [$norm($unitInput)])
+                        ->first();
+                }
+                if (!$unitModel) {
+                    // Try fuzzy matching (e.g. "Avluva" -> "Aluva")
+                    $allUnits  = Unit::with('district')->where('is_active', true)->get();
+                    $bestMatch = null;
+                    $bestDist  = 999;
+                    $normInput = $norm($unitInput);
+
+                    foreach ($allUnits as $u) {
+                        $normName = $norm($u->name);
+                        $dist     = levenshtein($normInput, $normName);
+                        // Allow distance 1 for short names, 2 for longer names
+                        $maxDist  = strlen($normName) > 5 ? 2 : 1;
+                        if ($dist <= $maxDist && $dist < $bestDist) {
+                            $bestDist  = $dist;
+                            $bestMatch = $u;
+                        }
+                    }
+
+                    if ($bestMatch) {
+                        $unitModel = $bestMatch;
+                    }
+                }
+                if (!$unitModel) {
+                    $errors[] = "Unit '{$unitInput}' not found";
                 }
             }
 
@@ -1853,7 +2228,19 @@ public function downloadTemplate()
             $isFummaMember = app(\App\Services\FummaMemberService::class)->isActive($data['phone']) ? 1 : 0;
 
             try {
-                \Illuminate\Support\Facades\DB::transaction(function () use ($data, $email, $dob, $stateModel, $districtModel, $unitModel, $isFummaMember) {
+                $profile = \Illuminate\Support\Facades\DB::transaction(function () use ($data, $email, $dob, $unitModel, $isFummaMember) {
+                    // Purge soft-deleted conflicting accounts if any
+                    if ($email) {
+                        $conflicting = User::withTrashed()->where('email', $email)->first();
+                        if ($conflicting && $conflicting->trashed()) {
+                            $conflicting->forceDelete();
+                        }
+                    }
+                    $conflictingPhone = User::withTrashed()->where('phone', $data['phone'])->first();
+                    if ($conflictingPhone && $conflictingPhone->trashed()) {
+                        $conflictingPhone->forceDelete();
+                    }
+
                     $user = User::create([
                         'name'      => $data['name'],
                         'email'     => $email, // null when left blank
@@ -1863,11 +2250,10 @@ public function downloadTemplate()
                         'is_active' => true,
                     ]);
 
-                    MemberProfile::create([
+                    $profile = MemberProfile::create([
                         'user_id'         => $user->id,
                         'unit_id'         => $unitModel->id,
-                        'district_id'     => $districtModel->id,
-                        'state_id'        => $stateModel->id,
+                        'state_id'        => State::fixed()?->id ?? 1,
                         'status'          => 'PENDING',
                         'dob'             => $dob,
                         'organization'    => $data['shop_name'],
@@ -1875,12 +2261,29 @@ public function downloadTemplate()
                         'photo'           => null,
                         'is_fumma_member' => $isFummaMember,
                     ]);
+
+                    // Automatically approve admin-imported members
+                    return app(\App\Services\MembershipService::class)->approve($profile);
                 });
+
+                if (!empty($email)) {
+                    try {
+                        Mail::to($email)->send(new \App\Mail\MemberApprovedMail(
+                            memberName:   $data['name'],
+                            membershipId: $profile->membership_id,
+                            unitName:     $unitModel->name ?? 'ECA Unit',
+                            phone:        $data['phone'],
+                        ));
+                    } catch (\Throwable $e) {
+                        Log::error('Bulk import approval email failed: ' . $e->getMessage());
+                    }
+                }
 
                 $results['success'][] = [
                     'row'             => $rowNumber,
                     'name'            => $data['name'],
                     'email'           => $email,
+                    'membership_id'   => $profile->membership_id,
                     'is_fumma_member' => $isFummaMember,
                 ];
                 $results['created']++;
@@ -2255,7 +2658,7 @@ public function downloadTemplate()
     public function schemes()
     {
         $schemes = \App\Models\Scheme::with('createdBy')
-            ->withCount(['dues', 'members'])
+            ->withCount(['dues', 'members', 'thirdPartyMembers'])
             ->latest()
             ->paginate(20);
 
@@ -2268,33 +2671,114 @@ public function downloadTemplate()
             ->whereIn('user_id', $creatorIds)->get()->keyBy('user_id');
 
         return view('admin.schemes', [
-            'schemes'        => $schemes,
-            'unitAdmins'     => $unitAdmins,
-            'districtAdmins' => $districtAdmins,
-            'allMembers'     => \App\Models\MemberProfile::with('user')
+            'schemes'           => $schemes,
+            'unitAdmins'        => $unitAdmins,
+            'districtAdmins'    => $districtAdmins,
+            'allMembers'        => \App\Models\MemberProfile::with(['user', 'unit'])
                 ->where('status', 'APPROVED')
                 ->get(),
+            'thirdPartyMembers' => \App\Models\SchemeThirdPartyMember::with('unit')->latest()->get(),
+            'units'             => \App\Models\Unit::where('is_active', true)->orderBy('name')->get(),
         ]);
+    }
+
+    public function storeThirdPartyMember(Request $request)
+    {
+        $request->validate([
+            'name'         => 'required|string|max:150',
+            'email'        => 'nullable|email|max:150',
+            'phone'        => 'required|string|max:20',
+            'dob'          => 'nullable|date',
+            'organization' => 'nullable|string|max:150',
+            'address'      => 'nullable|string|max:500',
+            'photo'        => 'nullable|image|max:2048',
+            'unit_id'      => 'nullable|exists:units,id',
+        ]);
+
+        $photoPath = null;
+        if ($request->hasFile('photo')) {
+            $photoPath = $request->file('photo')->store('third_party_photos', 'public');
+        }
+
+        $tpMember = \App\Models\SchemeThirdPartyMember::create([
+            'name'         => trim($request->name),
+            'email'        => $request->filled('email') ? trim($request->email) : null,
+            'phone'        => trim($request->phone),
+            'dob'          => $request->dob ?: null,
+            'organization' => $request->organization ?: null,
+            'address'      => $request->address ?: null,
+            'photo'        => $photoPath,
+            'unit_id'      => $request->unit_id ?: null,
+            'created_by'   => auth()->id(),
+        ]);
+
+        $tpMember->load('unit');
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Third-party member created successfully!',
+                'member'  => [
+                    'id'           => $tpMember->id,
+                    'name'         => $tpMember->name,
+                    'email'        => $tpMember->email ?: '—',
+                    'phone'        => $tpMember->phone,
+                    'organization' => $tpMember->organization ?: '—',
+                    'unit_name'    => $tpMember->unit->name ?? '—',
+                    'photo_url'    => $tpMember->photo ? asset('storage/' . $tpMember->photo) : null,
+                ],
+            ]);
+        }
+
+        return back()->with('success', 'Third-party member added successfully!');
     }
 
     public function storeScheme(Request $request)
     {
         $request->validate([
-            'title'           => 'required|string|max:200',
-            'description'     => 'nullable|string',
-            'amount'          => ['required', 'numeric', 'min:0.01', 'max:9999999', 'regex:/^\d{1,7}(\.\d{1,2})?$/'],
-            'duration_months' => 'required|integer|min:1|max:360',
-            'start_date'      => 'required|date',
-            'end_date'        => 'nullable|date|after_or_equal:start_date',
-            'member_ids'      => 'required|array|min:1',
-            'member_ids.*'    => 'exists:member_profiles,id',
+            'title'                  => 'required|string|max:200',
+            'description'            => 'nullable|string',
+            'amount'                 => ['required', 'numeric', 'min:0.01', 'max:9999999', 'regex:/^\d{1,7}(\.\d{1,2})?$/'],
+            'duration_months'        => 'required|integer|min:1|max:360',
+            'start_date'             => 'required|date',
+            'end_date'               => 'nullable|date|after_or_equal:start_date',
+            'member_ids'             => 'nullable|array',
+            'member_ids.*'           => 'exists:member_profiles,id',
+            'third_party_member_ids' => 'nullable|array',
+            'third_party_member_ids.*' => 'exists:scheme_third_party_members,id',
         ], [
-            'member_ids.required' => 'Select at least one member for this scheme.',
             'title.max'           => 'Title cannot exceed 200 characters.',
             'amount.max'          => 'Amount cannot exceed 7 digits (max ₹99,99,999).',
             'amount.regex'        => 'Enter a valid amount with up to 7 digits.',
             'duration_months.max' => 'Duration cannot exceed 360 months (30 years).',
         ]);
+
+        $selectedRegistered = $request->input('member_ids', []);
+        $selectedThirdParty = $request->input('third_party_member_ids', []);
+
+        // Support inline third-party member creation if submitted directly with the form
+        if ($request->filled('tp_name') && $request->filled('tp_phone')) {
+            $photoPath = null;
+            if ($request->hasFile('tp_photo')) {
+                $photoPath = $request->file('tp_photo')->store('third_party_photos', 'public');
+            }
+            $newTp = \App\Models\SchemeThirdPartyMember::create([
+                'name'         => trim($request->tp_name),
+                'email'        => $request->filled('tp_email') ? trim($request->tp_email) : null,
+                'phone'        => trim($request->tp_phone),
+                'dob'          => $request->tp_dob ?: null,
+                'organization' => $request->tp_organization ?: null,
+                'address'      => $request->tp_address ?: null,
+                'photo'        => $photoPath,
+                'unit_id'      => $request->tp_unit_id ?: null,
+                'created_by'   => auth()->id(),
+            ]);
+            $selectedThirdParty[] = $newTp->id;
+        }
+
+        if (empty($selectedRegistered) && empty($selectedThirdParty)) {
+            return back()->withErrors(['member_ids' => 'Select at least one member (registered or external third-party) for this scheme.'])->withInput();
+        }
 
         $scheme = \App\Models\Scheme::create([
             'title'           => $request->title,
@@ -2307,29 +2791,46 @@ public function downloadTemplate()
             'is_active'       => true,
         ]);
 
-        $scheme->members()->sync($request->member_ids);
+        // Sync registered members
+        $scheme->members()->sync($selectedRegistered);
 
-        return back()->with('success', 'Scheme created successfully! Applied to ' . count($request->member_ids) . ' selected member(s).');
+        // Sync third-party members
+        $scheme->thirdPartyMembers()->sync($selectedThirdParty);
+
+        // Generate initial scheme dues for third-party members
+        $this->generateThirdPartyDues($scheme, $selectedThirdParty);
+
+        $totalMembers = count($selectedRegistered) + count($selectedThirdParty);
+        return back()->with('success', "Scheme created successfully! Applied to {$totalMembers} member(s) (" . count($selectedRegistered) . " registered, " . count($selectedThirdParty) . " third-party).");
     }
 
     public function updateScheme(Request $request)
     {
         $request->validate([
-            'title'           => 'required|string|max:200',
-            'description'     => 'nullable|string',
-            'amount'          => ['required', 'numeric', 'min:0.01', 'max:9999999', 'regex:/^\d{1,7}(\.\d{1,2})?$/'],
-            'duration_months' => 'required|integer|min:1|max:360',
-            'start_date'      => 'required|date',
-            'end_date'        => 'nullable|date|after_or_equal:start_date',
-            'member_ids'      => 'required|array|min:1',
-            'member_ids.*'    => 'exists:member_profiles,id',
+            'id'                     => 'required|exists:schemes,id',
+            'title'                  => 'required|string|max:200',
+            'description'            => 'nullable|string',
+            'amount'                 => ['required', 'numeric', 'min:0.01', 'max:9999999', 'regex:/^\d{1,7}(\.\d{1,2})?$/'],
+            'duration_months'        => 'required|integer|min:1|max:360',
+            'start_date'             => 'required|date',
+            'end_date'               => 'nullable|date|after_or_equal:start_date',
+            'member_ids'             => 'nullable|array',
+            'member_ids.*'           => 'exists:member_profiles,id',
+            'third_party_member_ids' => 'nullable|array',
+            'third_party_member_ids.*' => 'exists:scheme_third_party_members,id',
         ], [
-            'member_ids.required' => 'Select at least one member for this scheme.',
             'title.max'           => 'Title cannot exceed 200 characters.',
             'amount.max'          => 'Amount cannot exceed 7 digits (max ₹99,99,999).',
             'amount.regex'        => 'Enter a valid amount with up to 7 digits.',
             'duration_months.max' => 'Duration cannot exceed 360 months (30 years).',
         ]);
+
+        $selectedRegistered = $request->input('member_ids', []);
+        $selectedThirdParty = $request->input('third_party_member_ids', []);
+
+        if (empty($selectedRegistered) && empty($selectedThirdParty)) {
+            return back()->withErrors(['member_ids' => 'Select at least one member (registered or external third-party) for this scheme.'])->withInput();
+        }
 
         $scheme = \App\Models\Scheme::find($request->id);
 
@@ -2342,34 +2843,86 @@ public function downloadTemplate()
             'end_date'        => $request->end_date,
         ]);
 
-        // Sync members — adding new ones, removing unselected ones.
-        // Existing SchemeFeeDue rows for removed members are left untouched
-        // (their history stays intact); they just stop getting new monthly dues.
-        $scheme->members()->sync($request->member_ids);
+        // Sync registered members
+        $scheme->members()->sync($selectedRegistered);
 
-        return back()->with('success', 'Scheme updated successfully! Now applies to ' . count($request->member_ids) . ' selected member(s).');
+        // Sync third-party members
+        $scheme->thirdPartyMembers()->sync($selectedThirdParty);
+
+        // Generate dues for any newly added third-party members
+        $this->generateThirdPartyDues($scheme, $selectedThirdParty);
+
+        $totalMembers = count($selectedRegistered) + count($selectedThirdParty);
+        return back()->with('success', "Scheme updated successfully! Now applies to {$totalMembers} member(s).");
+    }
+
+    private function generateThirdPartyDues(\App\Models\Scheme $scheme, array $thirdPartyIds): void
+    {
+        foreach ($thirdPartyIds as $tpId) {
+            for ($m = 0; $m < $scheme->duration_months; $m++) {
+                $dueDate = \Carbon\Carbon::parse($scheme->start_date)->copy()->addMonths($m);
+                $monthYear = $dueDate->format('Y-m');
+
+                $exists = \App\Models\SchemeFeeDue::where('scheme_id', $scheme->id)
+                    ->where('third_party_member_id', $tpId)
+                    ->where('month_year', $monthYear)
+                    ->exists();
+
+                if (!$exists) {
+                    \App\Models\SchemeFeeDue::create([
+                        'scheme_id'             => $scheme->id,
+                        'third_party_member_id' => $tpId,
+                        'member_profile_id'     => null,
+                        'amount'                => $scheme->amount,
+                        'due_date'              => $dueDate->copy()->startOfMonth()->addDays(9),
+                        'status'                => 'DUE',
+                        'month_year'            => $monthYear,
+                    ]);
+                }
+            }
+        }
     }
 
     public function schemeDetail($id)
     {
-        $scheme = \App\Models\Scheme::with('members.user')->find($id);
+        $scheme = \App\Models\Scheme::with([
+            'members.user',
+            'members.unit',
+            'thirdPartyMembers.unit',
+        ])->find($id);
 
         if (!$scheme) return response()->json(['error' => 'Not found'], 404);
 
         return response()->json([
-            'title'            => $scheme->title,
-            'description'      => $scheme->description,
-            'amount'           => $scheme->amount,
-            'duration_months'  => $scheme->duration_months,
-            'start_date_raw'   => $scheme->start_date?->format('Y-m-d'),
-            'end_date_raw'     => $scheme->end_date?->format('Y-m-d'),
-            'is_active'        => $scheme->is_active,
-            'member_ids'       => $scheme->members->pluck('id'),
-            'members'          => $scheme->members->map(function ($m) {
+            'title'                  => $scheme->title,
+            'description'            => $scheme->description,
+            'amount'                 => $scheme->amount,
+            'duration_months'        => $scheme->duration_months,
+            'start_date_raw'         => $scheme->start_date?->format('Y-m-d'),
+            'end_date_raw'           => $scheme->end_date?->format('Y-m-d'),
+            'is_active'              => $scheme->is_active,
+            'member_ids'             => $scheme->members->pluck('id'),
+            'third_party_member_ids' => $scheme->thirdPartyMembers->pluck('id'),
+            'members'                => $scheme->members->map(function ($m) {
                 return [
-                    'id'    => $m->id,
-                    'name'  => $m->user->name ?? '—',
-                    'email' => $m->user->email ?? '—',
+                    'id'             => $m->id,
+                    'name'           => $m->user->name ?? '—',
+                    'email'          => $m->user->email ?? '—',
+                    'phone'          => $m->user->phone ?? '—',
+                    'unit'           => $m->unit->name ?? '—',
+                    'is_third_party' => false,
+                ];
+            }),
+            'third_party_members'    => $scheme->thirdPartyMembers->map(function ($tp) {
+                return [
+                    'id'             => $tp->id,
+                    'name'           => $tp->name,
+                    'email'          => $tp->email ?: '—',
+                    'phone'          => $tp->phone,
+                    'organization'   => $tp->organization ?: '—',
+                    'unit'           => $tp->unit->name ?? '—',
+                    'photo'          => $tp->photo ? asset('storage/' . $tp->photo) : null,
+                    'is_third_party' => true,
                 ];
             }),
         ]);
@@ -2402,7 +2955,7 @@ public function downloadTemplate()
             return back()->with('error', 'Cannot delete! Some members have already paid dues under this scheme. Deactivate it instead.');
         }
 
-        $scheme->delete(); // cascades to scheme_members pivot and unpaid dues, if configured
+        $scheme->delete(); // cascades to scheme_members pivot, scheme_third_party_member pivot, and unpaid dues
         return back()->with('success', 'Scheme deleted successfully!');
     }
 
@@ -2411,6 +2964,7 @@ public function downloadTemplate()
         $scheme = \App\Models\Scheme::with([
             'dues.memberProfile.user',
             'dues.memberProfile.unit',
+            'dues.thirdPartyMember.unit',
         ])->find($id);
 
         if (!$scheme) {
@@ -2421,6 +2975,26 @@ public function downloadTemplate()
             'scheme' => $scheme,
             'dues'   => $scheme->dues,
         ]);
+    }
+
+    public function recordSchemeDuePayment(Request $request)
+    {
+        $request->validate([
+            'due_id'         => 'required|exists:scheme_fee_dues,id',
+            'payment_method' => 'required|string|max:50',
+            'paid_date'      => 'required|date',
+            'notes'          => 'nullable|string|max:255',
+        ]);
+
+        $due = \App\Models\SchemeFeeDue::findOrFail($request->due_id);
+        $due->update([
+            'status'         => 'PAID',
+            'paid_date'      => $request->paid_date,
+            'payment_method' => $request->payment_method,
+            'notes'          => $request->notes,
+        ]);
+
+        return back()->with('success', 'Payment recorded successfully!');
     }
 
     // ─────────────────────────────────
@@ -2815,6 +3389,199 @@ public function downloadTemplate()
             'paid_to'      => $expense->paid_to,
             'status'       => $expense->status,
         ]);
+    }
+
+    // ─────────────────────────────────
+    // UNIT CERTIFICATE CONFIGURATION
+    // ─────────────────────────────────
+    private function ensureCertificateColumnsExist(): void
+    {
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('units', 'certificate_logo') ||
+            !\Illuminate\Support\Facades\Schema::hasColumn('units', 'signatory_1_name')) {
+            try {
+                \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+            } catch (\Throwable $e) {}
+
+            try {
+                \Illuminate\Support\Facades\Schema::table('units', function (\Illuminate\Database\Schema\Blueprint $table) {
+                    if (!\Illuminate\Support\Facades\Schema::hasColumn('units', 'certificate_logo')) {
+                        $table->string('certificate_logo')->nullable();
+                    }
+                    if (!\Illuminate\Support\Facades\Schema::hasColumn('units', 'certificate_seal_text')) {
+                        $table->string('certificate_seal_text')->nullable();
+                    }
+                    if (!\Illuminate\Support\Facades\Schema::hasColumn('units', 'certificate_president_name')) {
+                        $table->string('certificate_president_name')->nullable();
+                    }
+                    if (!\Illuminate\Support\Facades\Schema::hasColumn('units', 'certificate_secretary_name')) {
+                        $table->string('certificate_secretary_name')->nullable();
+                    }
+                    if (!\Illuminate\Support\Facades\Schema::hasColumn('units', 'signatory_1_name')) {
+                        $table->string('signatory_1_name')->nullable();
+                    }
+                    if (!\Illuminate\Support\Facades\Schema::hasColumn('units', 'signatory_1_title')) {
+                        $table->string('signatory_1_title')->nullable();
+                    }
+                    if (!\Illuminate\Support\Facades\Schema::hasColumn('units', 'signatory_1_signature')) {
+                        $table->string('signatory_1_signature')->nullable();
+                    }
+                    if (!\Illuminate\Support\Facades\Schema::hasColumn('units', 'signatory_2_name')) {
+                        $table->string('signatory_2_name')->nullable();
+                    }
+                    if (!\Illuminate\Support\Facades\Schema::hasColumn('units', 'signatory_2_title')) {
+                        $table->string('signatory_2_title')->nullable();
+                    }
+                    if (!\Illuminate\Support\Facades\Schema::hasColumn('units', 'signatory_2_signature')) {
+                        $table->string('signatory_2_signature')->nullable();
+                    }
+                    if (!\Illuminate\Support\Facades\Schema::hasColumn('units', 'signatory_3_name')) {
+                        $table->string('signatory_3_name')->nullable();
+                    }
+                    if (!\Illuminate\Support\Facades\Schema::hasColumn('units', 'signatory_3_title')) {
+                        $table->string('signatory_3_title')->nullable();
+                    }
+                    if (!\Illuminate\Support\Facades\Schema::hasColumn('units', 'signatory_3_signature')) {
+                        $table->string('signatory_3_signature')->nullable();
+                    }
+                });
+            } catch (\Throwable $ex) {
+                \Illuminate\Support\Facades\Log::error('Auto-migration for units certificate columns failed: ' . $ex->getMessage());
+            }
+        }
+    }
+
+    public function updateUnitCertificate(Request $request, $id)
+    {
+        $this->ensureCertificateColumnsExist();
+        $unit = \App\Models\Unit::findOrFail($id);
+
+        $request->validate([
+            'certificate_logo'      => 'nullable|image|mimes:jpeg,png,jpg,webp,svg|max:3072',
+            'certificate_seal_text' => 'nullable|string|max:100',
+            'signatory_1_name'      => 'nullable|string|max:100',
+            'signatory_1_title'     => 'nullable|string|max:100',
+            'signatory_1_signature' => 'nullable|image|mimes:jpeg,png,jpg,webp,svg|max:2048',
+            'signatory_2_name'      => 'nullable|string|max:100',
+            'signatory_2_title'     => 'nullable|string|max:100',
+            'signatory_2_signature' => 'nullable|image|mimes:jpeg,png,jpg,webp,svg|max:2048',
+            'signatory_3_name'      => 'nullable|string|max:100',
+            'signatory_3_title'     => 'nullable|string|max:100',
+            'signatory_3_signature' => 'nullable|image|mimes:jpeg,png,jpg,webp,svg|max:2048',
+        ]);
+
+        if ($request->hasFile('certificate_logo')) {
+            if ($unit->certificate_logo && Storage::disk('public')->exists($unit->certificate_logo)) {
+                Storage::disk('public')->delete($unit->certificate_logo);
+            }
+            $file = $request->file('certificate_logo');
+            $fileName = 'unit_' . $unit->id . '_cert_logo_' . time() . '.' . $file->getClientOriginalExtension();
+            $unit->certificate_logo = $file->storeAs('unit_logos', $fileName, 'public');
+        }
+
+        $unit->certificate_seal_text = $request->filled('certificate_seal_text') ? trim($request->certificate_seal_text) : null;
+
+        foreach ([1, 2, 3] as $i) {
+            $nameField  = "signatory_{$i}_name";
+            $titleField = "signatory_{$i}_title";
+            $sigField   = "signatory_{$i}_signature";
+            $removeSig  = "remove_signatory_{$i}_signature";
+
+            if ($request->hasFile($sigField)) {
+                if ($unit->$sigField && Storage::disk('public')->exists($unit->$sigField)) {
+                    Storage::disk('public')->delete($unit->$sigField);
+                }
+                $file = $request->file($sigField);
+                $fileName = 'unit_' . $unit->id . "_sig_{$i}_" . time() . '.' . $file->getClientOriginalExtension();
+                $unit->$sigField = $file->storeAs('unit_signatures', $fileName, 'public');
+            } elseif ($request->boolean($removeSig)) {
+                if ($unit->$sigField && Storage::disk('public')->exists($unit->$sigField)) {
+                    Storage::disk('public')->delete($unit->$sigField);
+                }
+                $unit->$sigField = null;
+            }
+
+            $unit->$nameField  = $request->filled($nameField) ? trim($request->$nameField) : null;
+            $unit->$titleField = $request->filled($titleField) ? trim($request->$titleField) : null;
+        }
+
+        $unit->certificate_president_name = $unit->signatory_1_name;
+        $unit->certificate_secretary_name = $unit->signatory_2_name;
+        $unit->save();
+
+        return back()->with('success', "Certificate settings and signatories for unit '{$unit->name}' updated successfully!");
+    }
+
+    public function removeUnitCertificateLogo($id)
+    {
+        $unit = \App\Models\Unit::findOrFail($id);
+
+        if ($unit->certificate_logo && Storage::disk('public')->exists($unit->certificate_logo)) {
+            Storage::disk('public')->delete($unit->certificate_logo);
+        }
+
+        $unit->certificate_logo = null;
+        $unit->save();
+
+        return back()->with('success', "Certificate logo removed for unit '{$unit->name}'. It will now use the default logo.");
+    }
+
+    public function removeUnitSignatorySignature($id, $index)
+    {
+        $unit  = \App\Models\Unit::findOrFail($id);
+        $index = (int) $index;
+
+        if (in_array($index, [1, 2, 3])) {
+            $sigField = "signatory_{$index}_signature";
+            if ($unit->$sigField && Storage::disk('public')->exists($unit->$sigField)) {
+                Storage::disk('public')->delete($unit->$sigField);
+            }
+            $unit->$sigField = null;
+            $unit->save();
+        }
+
+        return back()->with('success', "Signatory {$index} signature removed for unit '{$unit->name}'.");
+    }
+
+    public function previewUnitCertificate($id)
+    {
+        $this->ensureCertificateColumnsExist();
+        $unit = \App\Models\Unit::with('district.state')->findOrFail($id);
+
+        $sampleProfile = MemberProfile::with('user')->where('unit_id', $unit->id)->first();
+        if (!$sampleProfile) {
+            $sampleProfile = new MemberProfile();
+            $sampleProfile->membership_id = 'FuMMA/' . strtoupper(substr(preg_replace('/[^A-Za-z]/', '', $unit->name), 0, 3)) . '/001';
+            $sampleProfile->joined_date = now()->format('Y-m-d');
+            $sampleUser = new \App\Models\User();
+            $sampleUser->name = 'Sample Member Name';
+            $sampleProfile->setRelation('user', $sampleUser);
+            $sampleProfile->setRelation('unit', $unit);
+        }
+
+        $logoDataUrl = null;
+        if ($unit->certificate_logo && Storage::disk('public')->exists($unit->certificate_logo)) {
+            $realLogoPath = Storage::disk('public')->path($unit->certificate_logo);
+            $mime         = @mime_content_type($realLogoPath) ?: 'image/png';
+            $logoDataUrl  = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($realLogoPath));
+        } else {
+            $defaultLogoPath = public_path('fumma-logo.png');
+            if (file_exists($defaultLogoPath)) {
+                $logoDataUrl = 'data:image/png;base64,' . base64_encode(file_get_contents($defaultLogoPath));
+            }
+        }
+
+        try {
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('certificates.membership', [
+                'profile' => $sampleProfile,
+                'unit'    => $unit,
+                'logo'    => $logoDataUrl,
+            ])->setPaper('a4', 'landscape');
+
+            return $pdf->stream('certificate_' . strtolower(preg_replace('/[^A-Za-z0-9]/', '_', $unit->name)) . '.pdf');
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Admin certificate preview failed: ' . $e->getMessage());
+            return back()->with('error', 'Unable to preview certificate: ' . $e->getMessage());
+        }
     }
 
     // ─────────────────────────────────

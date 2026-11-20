@@ -178,6 +178,25 @@ class DistrictAdminController extends Controller
 
     public function storeUnitAdmin(Request $request)
     {
+        $inputEmail = trim(strtolower($request->email ?? ''));
+        $inputPhone = trim($request->phone ?? '');
+
+        if ($inputEmail) {
+            $conflicting = User::withTrashed()->where('email', $inputEmail)->first();
+            if ($conflicting && ($conflicting->trashed() || $conflicting->role === 'district_admin')) {
+                \Illuminate\Support\Facades\DB::table('district_admins')->where('user_id', $conflicting->id)->delete();
+                $conflicting->forceDelete();
+            }
+        }
+
+        if ($inputPhone) {
+            $conflictingPhone = User::withTrashed()->where('phone', $inputPhone)->first();
+            if ($conflictingPhone && ($conflictingPhone->trashed() || $conflictingPhone->role === 'district_admin')) {
+                \Illuminate\Support\Facades\DB::table('district_admins')->where('user_id', $conflictingPhone->id)->delete();
+                $conflictingPhone->forceDelete();
+            }
+        }
+
         $districtId = $this->myDistrictId();
 
         $request->validate([
@@ -201,8 +220,7 @@ class DistrictAdminController extends Controller
             return back()->with('error', 'This unit already has an admin!');
         }
 
-        $firstName = preg_replace('/[^A-Za-z0-9]/', '', explode(' ', trim($request->name))[0]) ?: 'Admin';
-        $password  = $firstName . '@' . rand(1000, 9999);
+        $password = trim($request->phone);
 
         $user = User::create([
             'name'      => trim($request->name),
@@ -221,6 +239,7 @@ class DistrictAdminController extends Controller
 
         try {
             $unit = Unit::with('district')->find($request->unit_id);
+            $unitCode = str_pad($unit->id, 6, '0', STR_PAD_LEFT);
 
             Mail::to($user->email)->send(new UnitAdminWelcomeMail(
                 adminName:    $user->name,
@@ -228,12 +247,13 @@ class DistrictAdminController extends Controller
                 password:     $password,
                 unitName:     $unit->name,
                 districtName: $unit->district->name,
+                unitId:       $unitCode,
             ));
 
-            return back()->with('success', 'Unit Admin created! Password: ' . $password . ' (also emailed to ' . $user->email . ')');
+            return back()->with('success', 'Successfully created the account and sent the email ID and password.');
         } catch (\Exception $e) {
             Log::error('Unit Admin welcome email failed: ' . $e->getMessage());
-            return back()->with('success', 'Unit Admin created! Password: ' . $password . ' (Could not send the credentials email — please share manually.)');
+            return back()->with('success', 'Successfully created the account, but could not send the credentials email to ' . $user->email . ' (Password: ' . $password . ' — please share manually).');
         }
     }
 
@@ -282,8 +302,7 @@ class DistrictAdminController extends Controller
 
         $newPassword = null;
         if ($emailChanged || $request->boolean('resend_email')) {
-            $firstName   = explode(' ', $request->name)[0];
-            $newPassword = $firstName . '@' . rand(1000, 9999);
+            $newPassword = trim($request->phone);
             $user->password = $newPassword;
         }
 
@@ -297,12 +316,14 @@ class DistrictAdminController extends Controller
         if ($newPassword) {
             try {
                 $unit = Unit::with('district')->find($request->unit_id);
+                $unitCode = str_pad($unit->id, 6, '0', STR_PAD_LEFT);
                 Mail::to($user->email)->send(new UnitAdminWelcomeMail(
                     adminName:    $user->name,
                     email:        $user->email,
                     password:     $newPassword,
                     unitName:     $unit->name,
                     districtName: $unit->district->name,
+                    unitId:       $unitCode,
                 ));
                 $message .= ' New login credentials sent to ' . $user->email . '. Password: ' . $newPassword;
             } catch (\Exception $e) {
@@ -325,12 +346,27 @@ class DistrictAdminController extends Controller
         }
 
         $user        = User::find($unitAdmin->user_id);
-        $firstName   = explode(' ', $user->name)[0];
-        $newPassword = $firstName . '@' . rand(1000, 9999);
+        $newPassword = $user->phone;
         $user->password = $newPassword;
         $user->save();
 
-        return back()->with('success', 'Password reset! New password: ' . $newPassword);
+        try {
+            $unit = Unit::with('district')->find($unitAdmin->unit_id);
+            $unitCode = str_pad($unit->id, 6, '0', STR_PAD_LEFT);
+
+            Mail::to($user->email)->send(new UnitAdminWelcomeMail(
+                adminName:    $user->name,
+                email:        $user->email,
+                password:     $newPassword,
+                unitName:     $unit->name,
+                districtName: $unit->district->name,
+                unitId:       $unitCode,
+            ));
+        } catch (\Exception $e) {
+            Log::error('Unit Admin reset password email failed: ' . $e->getMessage());
+        }
+
+        return back()->with('success', 'Password reset! Login credentials sent to ' . $user->email . ' (Username: ' . str_pad($unitAdmin->unit_id, 6, '0', STR_PAD_LEFT) . ', Password: ' . $newPassword . ').');
     }
 
     public function toggleUnitAdminStatus(Request $request)
@@ -368,7 +404,10 @@ class DistrictAdminController extends Controller
 
         $user = User::find($unitAdmin->user_id);
         $unitAdmin->delete();
-        $user->delete();
+        if ($user) {
+            $user->tokens()->delete();
+            $user->forceDelete();
+        }
 
         return back()->with('success', 'Unit Admin deleted successfully!');
     }
@@ -381,6 +420,17 @@ class DistrictAdminController extends Controller
         $districtId = $this->myDistrictId();
         $query = MemberProfile::with(['user', 'unit'])->where('district_id', $districtId);
 
+        if ($request->filled('search')) {
+            $search = trim($request->search);
+            $query->where(function ($q) use ($search) {
+                $q->where('membership_id', 'LIKE', "%{$search}%")
+                  ->orWhereHas('user', function ($uq) use ($search) {
+                      $uq->where('phone', 'LIKE', "%{$search}%")
+                         ->orWhere('name', 'LIKE', "%{$search}%");
+                  });
+            });
+        }
+
         if ($request->filled('status'))  $query->where('status', $request->status);
         if ($request->filled('unit_id')) $query->where('unit_id', $request->unit_id);
 
@@ -389,6 +439,7 @@ class DistrictAdminController extends Controller
             'units'   => Unit::where('district_id', $districtId)->get(),
             'status'  => $request->status,
             'unit_id' => $request->unit_id,
+            'search'  => $request->search,
         ]);
     }
 
@@ -490,7 +541,7 @@ class DistrictAdminController extends Controller
             }
         }
 
-        $fummaNote = $isFummaMember ? ' FUMMA member: Yes.' : ' FUMMA member: No.';
+        $fummaNote = $isFummaMember ? ' Member Net: Yes.' : ' Member Net: No.';
 
         return back()->with(
             'success',
@@ -687,7 +738,6 @@ class DistrictAdminController extends Controller
                 'dob'          => trim($row[3] ?? ''),
                 'organization' => trim($row[4] ?? ''),
                 'unit'         => trim($row[5] ?? ''),
-                'taluk'        => trim($row[5] ?? ''),
                 'address'      => trim($row[6] ?? ''),
             ];
 
@@ -758,7 +808,7 @@ class DistrictAdminController extends Controller
 
             // ── Unit (matched by NAME, only inside this admin's district) ──
             $unitModel = null;
-            $unitInput = !empty($data['unit']) ? $data['unit'] : ($data['taluk'] ?? '');
+            $unitInput = trim($data['unit'] ?? '');
 
             if (empty($unitInput)) {
                 $errors[] = 'Unit is required';
@@ -782,7 +832,7 @@ class DistrictAdminController extends Controller
             $isFummaMember = app(\App\Services\FummaMemberService::class)->isActive($data['phone']) ? 1 : 0;
 
             try {
-                \Illuminate\Support\Facades\DB::transaction(function () use ($data, $email, $dob, $districtId, $district, $unitModel, $isFummaMember) {
+                $profile = \Illuminate\Support\Facades\DB::transaction(function () use ($data, $email, $dob, $districtId, $district, $unitModel, $isFummaMember) {
                     $user = User::create([
                         'name'      => $data['name'],
                         'email'     => $email, // null when left blank
@@ -792,7 +842,7 @@ class DistrictAdminController extends Controller
                         'is_active' => true,
                     ]);
 
-                    MemberProfile::create([
+                    $profile = MemberProfile::create([
                         'user_id'         => $user->id,
                         'unit_id'         => $unitModel->id,
                         'district_id'     => $districtId,
@@ -804,12 +854,28 @@ class DistrictAdminController extends Controller
                         'photo'           => null,
                         'is_fumma_member' => $isFummaMember,
                     ]);
+
+                    return app(\App\Services\MembershipService::class)->approve($profile);
                 });
+
+                if (!empty($email)) {
+                    try {
+                        Mail::to($email)->send(new \App\Mail\MemberApprovedMail(
+                            memberName:   $data['name'],
+                            membershipId: $profile->membership_id,
+                            unitName:     $unitModel->name ?? 'ECA Unit',
+                            phone:        $data['phone'],
+                        ));
+                    } catch (\Throwable $e) {
+                        Log::error('Bulk import approval email failed: ' . $e->getMessage());
+                    }
+                }
 
                 $results['success'][] = [
                     'row'             => $rowNumber,
                     'name'            => $data['name'],
                     'email'           => $email,
+                    'membership_id'   => $profile->membership_id,
                     'is_fumma_member' => $isFummaMember,
                 ];
                 $results['created']++;

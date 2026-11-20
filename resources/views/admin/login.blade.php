@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fumma Admin Login</title>
+<title>Member Net Admin Login</title>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 <style>
@@ -55,7 +55,7 @@
 <div class="box">
   <div class="logo">
     <div class="logo-icon">🎓</div>
-    <div class="logo-text">Fumma</div>
+    <div class="logo-text">Member Net</div>
     <div class="logo-sub">Education Consultancy Association</div>
   </div>
 
@@ -79,10 +79,10 @@
   <form method="POST" action="{{ route('admin.login.post') }}">
     @csrf
     <div class="fg">
-      <label>Email Address or Phone</label>
+      <label>Email, Phone, or 6-Digit Unit ID</label>
       <input type="text" name="email"
              value="{{ old('email') }}"
-             placeholder="admin@eca.com or 10-digit mobile" required autofocus>
+             placeholder="admin@eca.com, mobile, or 6-digit Unit ID" required autofocus>
     </div>
     <div class="fg fg-last">
   <label>Password</label>
