@@ -102,6 +102,42 @@ Route::get('/run-unit-id-migrations', function () {
     }
 });
 
+// ── RUN MEMBERSHIP ID FORMAT UPDATE HELPER ──
+Route::get('/run-membership-id-update', function () {
+    try {
+        $profiles = \App\Models\MemberProfile::with(['unit', 'user'])->whereNotNull('membership_id')->get();
+        $updated = [];
+
+        foreach ($profiles as $p) {
+            if (!preg_match('/^[A-Z]{3}\/[A-Z0-9]{4}\/[0-9]{3}$/', (string) $p->membership_id)) {
+                $oldId = $p->membership_id;
+                $newId = \App\Services\MembershipService::generateIdForMember($p->unit, $p->user?->name, $p->dob);
+                $p->membership_id = $newId;
+                $p->save();
+
+                $updated[] = [
+                    'id'     => $p->id,
+                    'name'   => $p->user?->name,
+                    'old_id' => $oldId,
+                    'new_id' => $newId,
+                ];
+            }
+        }
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Member IDs updated to new format (e.g. THA/RJ20/001)!',
+            'count'   => count($updated),
+            'updated' => $updated,
+        ]);
+    } catch (\Throwable $e) {
+        return response()->json([
+            'status'  => 'error',
+            'message' => $e->getMessage(),
+        ], 500);
+    }
+});
+
 // ── AUTH ──
 Route::match(['GET', 'POST'], '/login',
     [AuthController::class, 'login']);

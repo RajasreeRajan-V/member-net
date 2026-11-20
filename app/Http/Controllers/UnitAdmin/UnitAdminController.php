@@ -2480,7 +2480,7 @@ class UnitAdminController extends Controller
         $sampleProfile = MemberProfile::with('user')->where('unit_id', $unitId)->first();
         if (!$sampleProfile) {
             $sampleProfile = new MemberProfile();
-            $sampleProfile->membership_id = 'FuMMA/' . strtoupper(substr(preg_replace('/[^A-Za-z]/', '', $unit->name), 0, 3)) . '/001';
+            $sampleProfile->membership_id = \App\Services\MembershipService::generateIdForMember($unit, 'Sample Member', now()->format('Y-m-d'));
             $sampleProfile->joined_date = now()->format('Y-m-d');
             $sampleUser = new \App\Models\User();
             $sampleUser->name = 'Sample Member Name';

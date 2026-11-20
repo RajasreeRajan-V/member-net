@@ -33,9 +33,14 @@ class AuthController extends Controller
             ], 405);
         }
 
-        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
-            'email'    => 'required|email',
-            'password' => 'required',
+        $loginInput = trim((string) $request->input('email', $request->input('username', '')));
+
+        $validator = \Illuminate\Support\Facades\Validator::make([
+            'login'    => $loginInput,
+            'password' => $request->password,
+        ], [
+            'login'    => 'required|string',
+            'password' => 'required|string',
         ])->stopOnFirstFailure();
 
         if ($validator->fails()) {
@@ -47,9 +52,34 @@ class AuthController extends Controller
             ], 422);
         }
 
-        $user = User::where('email', $request->email)->first();
+        $user = null;
+        if (filter_var($loginInput, FILTER_VALIDATE_EMAIL)) {
+            $user = User::where('email', strtolower($loginInput))->first();
+        } else {
+            // Try Member ID (case-insensitive)
+            $matchedProfile = \App\Models\MemberProfile::where('membership_id', $loginInput)
+                ->orWhereRaw('UPPER(TRIM(membership_id)) = ?', [strtoupper($loginInput)])
+                ->first();
 
-        if (!$user || !Hash::check($request->password, $user->password)) {
+            if ($matchedProfile) {
+                $user = User::find($matchedProfile->user_id);
+            } else {
+                // Try phone number
+                $user = User::where('phone', $loginInput)->first();
+            }
+        }
+
+        $passwordValid = false;
+        if ($user) {
+            if ($user->role === 'member') {
+                $passwordValid = Hash::check($request->password, $user->password)
+                    || hash_equals((string) $user->phone, (string) $request->password);
+            } else {
+                $passwordValid = Hash::check($request->password, $user->password);
+            }
+        }
+
+        if (!$user || !$passwordValid) {
             return ApiResponse::error('Invalid email or password', 401);
         }
 
@@ -238,7 +268,7 @@ public function loginV2(Request $request)
                 'method'   => 'POST',
                 'endpoint' => url('/api/v2/login'),
                 'payload'  => [
-                    'username' => 'MemberNet/XXX/001 (or phone/email)',
+                    'username' => 'Member ID (e.g. THA/RJ20/001) or phone/email',
                     'password' => 'your_password (phone number for members)',
                 ],
             ],
@@ -261,23 +291,38 @@ public function loginV2(Request $request)
 
     $username      = trim($request->username);
     $memberProfile = null;
+    $user          = null;
 
     if (filter_var($username, FILTER_VALIDATE_EMAIL)) {
         // Email → admins (and pending members who have no membership ID yet)
-        $user = User::where('email', $username)->first();
+        $user = User::where('email', strtolower($username))->first();
+        if ($user && $user->role === 'member') {
+            $memberProfile = \App\Models\MemberProfile::where('user_id', $user->id)->first();
+        }
     } else {
-        // Anything else → membership ID
-        $memberProfile = \App\Models\MemberProfile::where('membership_id', $username)->first();
-        $user = $memberProfile ? User::find($memberProfile->user_id) : null;
+        // Member ID (case-insensitive)
+        $memberProfile = \App\Models\MemberProfile::where('membership_id', $username)
+            ->orWhereRaw('UPPER(TRIM(membership_id)) = ?', [strtoupper($username)])
+            ->first();
+
+        if ($memberProfile) {
+            $user = User::find($memberProfile->user_id);
+        } else {
+            // Try phone number
+            $user = User::where('phone', $username)->first();
+            if ($user && $user->role === 'member') {
+                $memberProfile = \App\Models\MemberProfile::where('user_id', $user->id)->first();
+            }
+        }
     }
 
     if (!$user) {
         return ApiResponse::error('Invalid username or password', 401);
     }
 
-    // Members: password = phone number. Admins: hashed password.
+    // Members: password = phone number or updated password. Admins: hashed password.
     $valid = $user->role === 'member'
-        ? hash_equals((string) $user->phone, (string) $request->password)
+        ? (hash_equals((string) $user->phone, (string) $request->password) || Hash::check($request->password, $user->password))
         : Hash::check($request->password, $user->password);
 
     if (!$valid) {
