@@ -51,7 +51,7 @@
   <div class="logo">
     <div class="logo-icon">🎓</div>
     <div class="logo-text">ECA</div>
-    <div class="logo-sub">Education Consultancy Association</div>
+    <div class="logo-sub">Member Net Association</div>
   </div>
 
   <div class="title">Forgot Password</div>

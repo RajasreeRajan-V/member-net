@@ -171,6 +171,7 @@ class DistrictAdminController extends Controller
         return view('district-admin.unit-admins', [
             'unitAdmins' => UnitAdmin::with(['user', 'unit'])
                 ->whereHas('unit', fn($q) => $q->where('district_id', $districtId))
+                ->latest('id')
                 ->get(),
             'units' => Unit::where('district_id', $districtId)->doesntHave('unitAdmin')->get(),
         ]);

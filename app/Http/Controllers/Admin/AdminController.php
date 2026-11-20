@@ -338,7 +338,7 @@ public function storeUnit(Request $request)
             'unitAdmins' => UnitAdmin::with([
                 'user',
                 'unit.district.state'
-            ])->get(),
+            ])->latest('id')->get(),
             'units' => Unit::with('district.state')
                 ->doesntHave('unitAdmin')
                 ->get(),

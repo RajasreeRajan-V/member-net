@@ -129,7 +129,7 @@
   </div>
 
   <div class="footer">
-    &copy; {{ date('Y') }} Member Net — Consultancy Association<br>
+    &copy; {{ date('Y') }} Member Net Association<br>
     This is an automated email. Please do not reply directly.
   </div>
 

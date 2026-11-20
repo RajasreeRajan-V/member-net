@@ -1055,7 +1055,7 @@
         <div class="sl-icon">🎓</div>
         <span class="sl-text">Member Net</span>
       </div>
-      <div class="sl-sub">Education Consultancy Association</div>
+      <div class="sl-sub">Member Net Association</div>
     </div>
 
     <nav class="snav">

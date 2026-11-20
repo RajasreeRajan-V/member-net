@@ -109,7 +109,7 @@
     <div class="logo">
       <div class="logo-icon">🎓</div>
       <div class="logo-text">Member Net</div>
-      <div class="logo-sub">Education Consultancy Association</div>
+      <div class="logo-sub">Member Net Association</div>
     </div>
 
     

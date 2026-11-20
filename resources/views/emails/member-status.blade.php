@@ -67,13 +67,13 @@
   @if($status === 'approved')
     <div class="header-approved">
       <h1>🎓 Member Net</h1>
-      <p>Education Consultancy Association</p>
+      <p>Member Net Association</p>
       <div class="badge">✅ Membership Approved</div>
     </div>
   @else
     <div class="header-rejected">
       <h1>🎓 Member Net</h1>
-      <p>Education Consultancy Association</p>
+      <p>Member Net Association</p>
       <div class="badge">❌ Application Update</div>
     </div>
   @endif

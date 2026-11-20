@@ -19,7 +19,7 @@
   <div class="wrap">
     <div class="header">
       <h1>🎓 ECA</h1>
-      <p>Education Consultancy Association</p>
+      <p>Member Net Association</p>
     </div>
     <div class="body">
       <p>Hi <b>{{ $userName }}</b>,</p>
@@ -30,7 +30,7 @@
       </div>
     </div>
     <div class="footer">
-      &copy; {{ date('Y') }} ECA — Education Consultancy Association
+      &copy; {{ date('Y') }} ECA — Member Net Association
     </div>
   </div>
 </body>
