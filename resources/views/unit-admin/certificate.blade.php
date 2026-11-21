@@ -84,7 +84,7 @@
           Certificate Seal Text (Optional)
         </label>
         <input type="text" name="certificate_seal_text" value="{{ old('certificate_seal_text', $unit->certificate_seal_text) }}"
-               placeholder="e.g. {{ $unit->name }} Unit (leave empty for default 'Member Net')"
+               placeholder="e.g. {{ $unit->name }} 2026 (leave empty for default '{{ $unit->name }} 2026')"
                maxlength="100"
                style="width:100%;padding:8px 12px;font-size:12.5px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);">
         <span style="font-size:10.5px;color:var(--text-dim);margin-top:3px;display:block;">

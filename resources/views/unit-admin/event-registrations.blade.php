@@ -87,7 +87,6 @@
             <th>Member</th>
             <th>Phone</th>
             <th>Unit</th>
-            <th>District</th>
             <th>Registered On</th>
             <th>Payment</th>
           </tr>
@@ -109,7 +108,6 @@
             </td>
             <td style="color:var(--text-dim);">{{ $reg->user->phone ?? '—' }}</td>
             <td>{{ $reg->memberProfile?->unit?->name ?? '—' }}</td>
-            <td style="color:var(--text-dim);">{{ $reg->memberProfile?->district?->name ?? '—' }}</td>
             <td style="color:var(--text-dim);">{{ $reg->created_at->format('d M Y') }}</td>
             <td>
               @if($event->ticket_type === 'FREE')

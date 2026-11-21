@@ -24,9 +24,6 @@
     <button class="rpt-btn" onclick="showReport('unit')" id="btn-unit">
       <i class="fas fa-building"></i> Unit-wise Report
     </button>
-    <button class="rpt-btn" onclick="showReport('district')" id="btn-district">
-      <i class="fas fa-map"></i> District-wise Report
-    </button>
     <button class="rpt-btn" onclick="showReport('monthly')" id="btn-monthly">
       <i class="fas fa-calendar-alt"></i> Monthly Report
     </button>
@@ -289,73 +286,7 @@
   </div>
 </div>
 
-{{-- ── 5. DISTRICT-WISE REPORT ── --}}
-<div class="rpt-section" id="rpt-district" style="display:none;">
-  <div class="card">
-    <div class="ch">
-      <div class="ct"><i class="fas fa-map"></i> District-wise Report</div>
-    </div>
-    <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
-      @unless($fixedState)
-      <div class="fg" style="margin:0;min-width:130px;flex:1;">
-        <label>State</label>
-        <select id="dist_state" onchange="cascadeDistricts('dist_state','dist_district','dist_unit_na')">
-          <option value="">All States</option>
-          @foreach($states as $s)<option value="{{ $s->id }}">{{ $s->name }}</option>@endforeach
-        </select>
-      </div>
-      @endunless
-      <div class="fg" style="margin:0;min-width:130px;flex:1;">
-        <label>District</label>
-        <select id="dist_district">
-          <option value="">All Districts</option>
-          @foreach($districts as $d)<option value="{{ $d->id }}" data-state="{{ $d->state_id }}">{{ $d->name }}</option>@endforeach
-        </select>
-      </div>
-      <div class="fg" style="margin:0;min-width:110px;flex:1;">
-        <label>Status</label>
-        <select id="dist_status">
-          <option value="">All</option>
-          <option value="PENDING">Pending</option>
-          <option value="APPROVED">Approved</option>
-          <option value="ACTIVE">Active</option>
-          <option value="REJECTED">Rejected</option>
-        </select>
-      </div>
-      <div style="display:flex;gap:6px;">
-        <button class="btn bp" onclick="loadReport('district')"><i class="fas fa-search"></i> Search</button>
-        <button class="btn bo" onclick="resetReport('district')"><i class="fas fa-times"></i></button>
-      </div>
-    </div>
-
-    {{-- Top districts summary --}}
-    <div style="padding:14px 18px;border-bottom:1px solid var(--border);">
-      <div style="font-size:10.5px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">Top Districts by Member Count</div>
-      @forelse($topDistricts as $i => $d)
-      <div style="margin-bottom:9px;">
-        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;">
-          <span style="color:var(--text);font-weight:500;">{{ $d->name }}</span>
-          <span style="color:{{ $colors[$i] }};font-weight:700;">{{ $d->member_profiles_count }} members</span>
-        </div>
-        <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;">
-          <div style="height:100%;width:{{ $topDistricts->first()->member_profiles_count > 0 ? round(($d->member_profiles_count/$topDistricts->first()->member_profiles_count)*100) : 0 }}%;background:{{ $colors[$i] }};border-radius:3px;transition:width 1s;"></div>
-        </div>
-      </div>
-      @empty
-        <div style="color:var(--text-dim);font-size:12px;">No data yet</div>
-      @endforelse
-    </div>
-
-    <div id="dist_stats" class="rpt-stats" style="display:none;"></div>
-    <div id="dist_body" class="rpt-body">@include('admin.partials.report-initial')</div>
-    <div id="dist_footer" class="rpt-footer" style="display:none;">
-      <span style="font-size:11px;color:var(--text-dim);"><i class="fas fa-info-circle"></i> District-wise member details</span>
-      <button class="btn bp" onclick="downloadReport('district')"><i class="fas fa-download"></i> Download CSV</button>
-    </div>
-  </div>
-</div>
-
-{{-- ── 6. MONTHLY REPORT ── --}}
+{{-- ── 5. MONTHLY REPORT ── --}}
 <div class="rpt-section" id="rpt-monthly" style="display:none;">
   <div class="card">
     <div class="ch">
@@ -424,7 +355,7 @@
   </div>
 </div>
 
-{{-- ── 7. FUNDRAISING REPORT ── --}}
+{{-- ── 6. FUNDRAISING REPORT ── --}}
 <div class="rpt-section" id="rpt-fundraising" style="display:none;">
   <div class="card">
     <div class="ch">
@@ -489,7 +420,7 @@
   </div>
 </div>
 
-{{-- ── 8. COMMITTEES REPORT ── --}}
+{{-- ── 7. COMMITTEES REPORT ── --}}
 <div class="rpt-section" id="rpt-committees" style="display:none;">
   <div class="card">
     <div class="ch">
@@ -544,7 +475,7 @@
   </div>
 </div>
 
-{{-- ── 9. OTHER FEES REPORT ── --}}
+{{-- ── 8. OTHER FEES REPORT ── --}}
 <div class="rpt-section" id="rpt-otherfees" style="display:none;">
   <div class="card">
     <div class="ch">
@@ -606,7 +537,7 @@
   </div>
 </div>
 
-{{-- ── 10. SCHEMES REPORT ── --}}
+{{-- ── 9. SCHEMES REPORT ── --}}
 <div class="rpt-section" id="rpt-schemes" style="display:none;">
   <div class="card">
     <div class="ch">
@@ -801,7 +732,6 @@ const reportConfig = {
   status:     { prefix:'sts',  fixedStatus: null },
   pending:    { prefix:'pen',  fixedStatus: 'PENDING' },
   unit:       { prefix:'unit', fixedStatus: null },
-  district:   { prefix:'dist', fixedStatus: null },
   monthly:    { prefix:'mon',  fixedStatus: null },
 };
 
@@ -817,7 +747,6 @@ function getReportFilters(name) {
   if (name === 'status')     { f.status=get('sts_status'); f.date_from=get('sts_from'); f.date_to=get('sts_to'); }
   if (name === 'pending')    { f.state_id=get('pen_state'); f.district_id=get('pen_district'); f.unit_id=get('pen_unit'); f.membership_type=get('pen_type'); }
   if (name === 'unit')       { f.state_id=get('unit_state'); f.district_id=get('unit_district'); f.unit_id=get('unit_unit'); f.status=get('unit_status'); }
-  if (name === 'district')   { f.state_id=get('dist_state'); f.district_id=get('dist_district'); f.status=get('dist_status'); }
   if (name === 'monthly')    { f.month=get('mon_month'); f.year=get('mon_year'); f.status=get('mon_status'); f.membership_type=get('mon_type'); f.date_from=get('mon_from'); f.date_to=get('mon_to'); }
 
   return f;

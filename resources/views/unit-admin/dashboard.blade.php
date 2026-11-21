@@ -23,11 +23,6 @@
       </span>
     </div>
     <div style="font-size:11px;color:var(--text-dim);margin-top:2px;">
-            {{ $unit->district->name ?? '' }}
-      @unless(\App\Models\State::fixed())
-        · {{ $unit->district->state->name ?? '' }}
-      @endunless
-      &nbsp;·&nbsp;
       <i class="fas fa-calendar" style="color:var(--accent);"></i>
       {{ now()->format('d M Y') }}
     </div>

@@ -247,56 +247,47 @@ public function updateDistrict(Request $request)
     }
 
     public function units()
-{
-    $fixed = State::fixed();
+    {
+        $fixed = State::fixed();
 
-    return view('admin.units', [
-        'fixedState' => $fixed,
-        'units'      => Unit::with('district.state')
-            ->when($fixed, fn($q) => $q->whereHas('district', fn($d) => $d->where('state_id', $fixed->id)))
-            ->get(),
-        'states'     => State::where('is_active', true)->get(),
-        // Kerala districts, used to fill the dropdown when Kerala is fixed
-        'districts'  => $fixed
-            ? District::where('state_id', $fixed->id)->where('is_active', true)->orderBy('name')->get()
-            : collect(),
-    ]);
-}
-
-public function storeUnit(Request $request)
-{
-    $fixed = State::fixed();
-
-    // When Kerala is fixed, the district must belong to Kerala
-    $districtRule = Rule::exists('districts', 'id');
-    if ($fixed) {
-        $districtRule = $districtRule->where('state_id', $fixed->id);
+        return view('admin.units', [
+            'fixedState' => $fixed,
+            'units'      => Unit::with('district.state')
+                ->latest()
+                ->get(),
+            'states'     => State::where('is_active', true)->get(),
+            // Kerala districts, used to fill the dropdown when Kerala is fixed
+            'districts'  => $fixed
+                ? District::where('state_id', $fixed->id)->where('is_active', true)->orderBy('name')->get()
+                : collect(),
+        ]);
     }
 
-    $request->validate([
-        'district_id' => ['required', $districtRule],
-        'name' => [
-            'required',
-            'string',
-            'max:100',
-            'regex:/^[a-zA-Z\s\'\-]+$/',
-            Rule::unique('units')
-                ->where(fn($q) => $q->where('district_id', $request->district_id))
-        ],
-    ], [
-        'name.max'    => 'Unit name cannot exceed 100 characters.',
-        'name.regex'  => 'Unit name can only contain letters, spaces, hyphens and apostrophes.',
-        'name.unique' => 'This unit already exists in the selected district.',
-    ]);
+    public function storeUnit(Request $request)
+    {
+        $request->validate([
+            'name' => [
+                'required',
+                'string',
+                'max:100',
+                'regex:/^[a-zA-Z\s\'\-]+$/',
+                Rule::unique('units', 'name'),
+            ],
+            'district_id' => ['nullable', 'exists:districts,id'],
+        ], [
+            'name.max'    => 'Unit name cannot exceed 100 characters.',
+            'name.regex'  => 'Unit name can only contain letters, spaces, hyphens and apostrophes.',
+            'name.unique' => 'A unit with this name already exists.',
+        ]);
 
-    Unit::create([
-        'district_id' => $request->district_id,
-        'name'        => trim($request->name),
-        'unit_id'     => Unit::generateUnitId($request->name),
-        'is_active'   => true
-    ]);
-    return back()->with('success', 'Unit created successfully!');
-}
+        Unit::create([
+            'district_id' => $request->district_id ?? null,
+            'name'        => trim($request->name),
+            'unit_id'     => Unit::generateUnitId($request->name),
+            'is_active'   => true
+        ]);
+        return back()->with('success', 'Unit created successfully!');
+    }
 
     public function updateUnit(Request $request)
     {
@@ -3582,11 +3573,18 @@ public function updateMember(Request $request)
             }
         }
 
+        $joinedYear   = date('Y');
+        $baseSealName = (!empty($unit->certificate_seal_text) && trim($unit->certificate_seal_text) !== 'Member Net')
+            ? trim($unit->certificate_seal_text)
+            : ($unit->name ?? 'Member Net');
+
         try {
             $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('certificates.membership', [
-                'profile' => $sampleProfile,
-                'unit'    => $unit,
-                'logo'    => $logoDataUrl,
+                'profile'  => $sampleProfile,
+                'unit'     => $unit,
+                'logo'     => $logoDataUrl,
+                'sealText' => $baseSealName,
+                'sealYear' => $joinedYear,
             ])->setPaper('a4', 'landscape');
 
             return $pdf->stream('certificate_' . strtolower(preg_replace('/[^A-Za-z0-9]/', '_', $unit->name)) . '.pdf');

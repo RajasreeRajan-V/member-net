@@ -18,10 +18,6 @@
           <th>#</th>
           <th>Unit ID</th>
           <th>Unit Name</th>
-          <th>District</th>
-          @unless($fixedState)
-            <th>State</th>
-          @endunless
           <th>Certificate Logo</th>
           <th>Actions</th>
         </tr>
@@ -36,14 +32,6 @@
             </span>
           </td>
           <td><b>{{ $unit->name }}</b></td>
-          <td style="color:var(--text-dim)">
-            {{ $unit->district->name }}
-          </td>
-          @unless($fixedState)
-            <td style="color:var(--text-dim)">
-              {{ $unit->district->state->name }}
-            </td>
-          @endunless
           <td>
             @if($unit->certificate_logo && \Illuminate\Support\Facades\Storage::disk('public')->exists($unit->certificate_logo))
               <div style="display:flex;align-items:center;gap:8px;">
@@ -68,9 +56,7 @@
               <div class="ab ed"
                 onclick="editUnit(
                   {{ $unit->id }},
-                  '{{ addslashes($unit->name) }}',
-                  {{ $unit->district_id }},
-                  {{ $unit->district->state_id }})">
+                  '{{ addslashes($unit->name) }}')">
                 <i class="fas fa-edit"></i>
               </div>
               <form method="POST"
@@ -88,7 +74,7 @@
         </tr>
         @empty
         <tr>
-          <td colspan="{{ $fixedState ? 6 : 7 }}"
+          <td colspan="5"
             style="text-align:center;color:var(--text-dim);padding:30px;">
             No units yet
           </td>
@@ -125,40 +111,6 @@
       @endif
 
       <div class="fgrid c1">
-        @if($fixedState)
-          {{-- Kerala is fixed: no State dropdown, districts are already loaded --}}
-          <div class="fg">
-            <label>District</label>
-            <select name="district_id" id="addUnitDistrict" required>
-              <option value="">Select District</option>
-              @foreach($districts as $d)
-                <option value="{{ $d->id }}"
-                  @selected(old('form') === 'create' && old('district_id') == $d->id)>
-                  {{ $d->name }}
-                </option>
-              @endforeach
-            </select>
-          </div>
-        @else
-          <div class="fg">
-            <label>State</label>
-            <select id="addUnitState"
-                    onchange="loadDistricts(this.value)">
-              <option value="">Select State</option>
-              @foreach($states as $state)
-                <option value="{{ $state->id }}">
-                  {{ $state->name }}
-                </option>
-              @endforeach
-            </select>
-          </div>
-          <div class="fg">
-            <label>District</label>
-            <select name="district_id" id="addUnitDistrict" required>
-              <option value="">Select State First</option>
-            </select>
-          </div>
-        @endif
         <div class="fg">
           <label>Unit Name</label>
           <input type="text" name="name" id="addUnitName"
@@ -366,7 +318,6 @@
 
 @section('scripts')
 <script>
-const KERALA_FIXED = {{ $fixedState ? 'true' : 'false' }};
 let currentCertUnitId = null;
 
 function openCertConfigModal(unit) {
@@ -440,38 +391,6 @@ function removeAdminCertLogo() {
   }
 }
 
-function loadDistricts(stateId) {
-  if (!stateId) return;
-
-  const select = document.getElementById('addUnitDistrict');
-  select.innerHTML = '<option value="">Loading...</option>';
-
-  fetch(`{{ route('admin.districts.by-state') }}`, {
-    method: 'POST',
-    headers: {
-      'Accept': 'application/json',
-      'Content-Type': 'application/json',
-      'X-CSRF-TOKEN': '{{ csrf_token() }}'
-    },
-    body: JSON.stringify({ state_id: stateId })
-  })
-  .then(r => r.json())
-  .then(data => {
-    select.innerHTML = '<option value="">Select District</option>';
-    if (data.data && data.data.length > 0) {
-      data.data.forEach(d => {
-        select.innerHTML += `<option value="${d.id}">${d.name}</option>`;
-      });
-    } else {
-      select.innerHTML = '<option value="">No districts found</option>';
-    }
-  })
-  .catch(err => {
-    select.innerHTML = '<option value="">Error loading districts</option>';
-    console.error('District load failed:', err);
-  });
-}
-
 // ── Reset "Add Unit" modal: clears stale error banner + inputs ──
 function resetAddUnitModal() {
   const errBox = document.getElementById('addUnitError');
@@ -479,17 +398,6 @@ function resetAddUnitModal() {
 
   const name = document.getElementById('addUnitName');
   if (name) name.value = '';
-
-  const distSelect = document.getElementById('addUnitDistrict');
-
-  if (KERALA_FIXED) {
-    // District list is already filled with Kerala districts: just deselect
-    if (distSelect) distSelect.value = '';
-  } else {
-    const stateSelect = document.getElementById('addUnitState');
-    if (stateSelect) stateSelect.value = '';
-    if (distSelect) distSelect.innerHTML = '<option value="">Select State First</option>';
-  }
 }
 
 // ── Reset "Edit Unit" modal: clears stale error banner ──

@@ -405,7 +405,6 @@ class MemberController extends Controller
                                         ? asset('storage/' . $profile->photo)
                                         : null,
                 'unit_name'       => $profile->unit->name ?? '—',
-                'district_name'   => $profile->district?->name ?? '—',
                 'state_name'      => $profile->state->name,
                 'joined_date'     => (string) $profile->joined_date,
                 'expiry_date'     => (string) $profile->expiry_date,
@@ -447,11 +446,9 @@ class MemberController extends Controller
                 'membership_id'   => $profile->membership_id,
                 'status'          => $profile->status,
                 'unit_id'         => (string) $profile->unit_id,
-                'unit_name'       => $profile->unit->name,
-                'district_id'     => (string) ($profile->district_id ?? ''),
-                'district_name'   => $profile->district?->name ?? '—',
+                'unit_name'       => $profile->unit?->name ?? '—',
                 'state_id'        => (string) $profile->state_id,
-                'state_name'      => $profile->state->name,
+                'state_name'      => $profile->state?->name ?? '—',
                 'joined_date'     => (string) $profile->joined_date,
                 'expiry_date'     => (string) $profile->expiry_date,
                 'registered_on'   => (string) $profile->created_at,
@@ -848,34 +845,135 @@ public function certificateInfo()
         return ApiResponse::error('Certificate is available only after approval.', 403);
     }
 
+    $unit = $profile->unit ?? ($profile->unit_id ? Unit::find($profile->unit_id) : null);
+    if ($unit) {
+        $unit->refresh();
+    }
+
+    // Helper to resolve files safely whether stored in Storage disk 'public' or public_path
+    $resolveFile = function (?string $path, string $fallbackAsset) {
+        if (!$path) {
+            return [
+                'public_url'   => asset($fallbackAsset),
+                'storage_path' => null,
+                'is_custom'    => false,
+            ];
+        }
+
+        $cleanPath = ltrim(preg_replace('#^/?storage/#', '', $path), '/');
+
+        if (Storage::disk('public')->exists($cleanPath)) {
+            return [
+                'public_url'   => asset('storage/' . $cleanPath),
+                'storage_path' => Storage::disk('public')->path($cleanPath),
+                'is_custom'    => true,
+            ];
+        }
+
+        if (file_exists(public_path('storage/' . $cleanPath))) {
+            return [
+                'public_url'   => asset('storage/' . $cleanPath),
+                'storage_path' => public_path('storage/' . $cleanPath),
+                'is_custom'    => true,
+            ];
+        }
+
+        if (file_exists(storage_path('app/public/' . $cleanPath))) {
+            return [
+                'public_url'   => asset('storage/' . $cleanPath),
+                'storage_path' => storage_path('app/public/' . $cleanPath),
+                'is_custom'    => true,
+            ];
+        }
+
+        return [
+            'public_url'   => asset($fallbackAsset),
+            'storage_path' => null,
+            'is_custom'    => false,
+        ];
+    };
+
+    // ── DYNAMIC UNIT-SPECIFIC CERTIFICATE LOGO ──
+    $logoRes       = $resolveFile($unit?->certificate_logo, 'fumma-logo.png');
+    $logoPublicUrl = $logoRes['public_url'];
+    $isCustomLogo  = $logoRes['is_custom'];
+    $logoDataUrl   = null;
+
+    if ($logoRes['storage_path'] && file_exists($logoRes['storage_path'])) {
+        $mime        = @mime_content_type($logoRes['storage_path']) ?: 'image/png';
+        $logoDataUrl = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($logoRes['storage_path']));
+    } else {
+        $defaultLogoPath = public_path('fumma-logo.png');
+        if (file_exists($defaultLogoPath)) {
+            $logoDataUrl = 'data:image/png;base64,' . base64_encode(file_get_contents($defaultLogoPath));
+        }
+    }
+
+    // ── SEAL TEXT & YEAR (replaces "Member Net 2026" with "[Unit Name] 2026") ──
+    $joinedYear   = $profile->joined_date ? \Carbon\Carbon::parse($profile->joined_date)->format('Y') : date('Y');
+    $baseSealName = ($unit && !empty($unit->certificate_seal_text) && trim($unit->certificate_seal_text) !== 'Member Net')
+        ? trim($unit->certificate_seal_text)
+        : ($unit?->name ?? 'Member Net');
+    $sealFullText = preg_match('/\b' . $joinedYear . '\b/', $baseSealName)
+        ? $baseSealName
+        : ($baseSealName . ' ' . $joinedYear);
+
+    // ── SIGNATORIES CONFIGURED IN UNIT ADMIN PANEL ──
+    $s1Name  = ($unit && $unit->signatory_1_name) ? $unit->signatory_1_name : (($unit && $unit->certificate_president_name) ? $unit->certificate_president_name : 'Tony Pulickal');
+    $s1Title = ($unit && $unit->signatory_1_title) ? $unit->signatory_1_title : (($unit && ($unit->signatory_1_name || $unit->certificate_president_name)) ? ($unit->name . ' Unit President') : 'State President');
+    $sig1Res = $resolveFile($unit?->signatory_1_signature, 'sign-president.png');
+    $s1Sig   = $sig1Res['public_url'];
+
+    $s2Name  = ($unit && $unit->signatory_2_name) ? $unit->signatory_2_name : (($unit && $unit->certificate_secretary_name) ? $unit->certificate_secretary_name : 'Shaji Manhar');
+    $s2Title = ($unit && $unit->signatory_2_title) ? $unit->signatory_2_title : (($unit && ($unit->signatory_2_name || $unit->certificate_secretary_name)) ? ($unit->name . ' Unit Gen. Secretary') : 'State General Secretary');
+    $sig2Res = $resolveFile($unit?->signatory_2_signature, 'sign-secretary.png');
+    $s2Sig   = $sig2Res['public_url'];
+
+    $s3Name  = ($unit && $unit->signatory_3_name) ? $unit->signatory_3_name : 'Rafi Puthoor';
+    $s3Title = ($unit && $unit->signatory_3_title) ? $unit->signatory_3_title : (($unit && $unit->signatory_3_name) ? ($unit->name . ' Unit Treasurer') : 'State Treasurer');
+    $sig3Res = $resolveFile($unit?->signatory_3_signature, 'sign-treasurer.png');
+    $s3Sig   = $sig3Res['public_url'];
+
+    $signatory1 = [
+        'name'                 => $s1Name,
+        'title'                => $s1Title,
+        'designation'          => $s1Title,
+        'signature'            => $s1Sig,
+        'signature_url'        => $s1Sig,
+        'has_custom_signature' => $sig1Res['is_custom'],
+    ];
+
+    $signatory2 = [
+        'name'                 => $s2Name,
+        'title'                => $s2Title,
+        'designation'          => $s2Title,
+        'signature'            => $s2Sig,
+        'signature_url'        => $s2Sig,
+        'has_custom_signature' => $sig2Res['is_custom'],
+    ];
+
+    $signatory3 = [
+        'name'                 => $s3Name,
+        'title'                => $s3Title,
+        'designation'          => $s3Title,
+        'signature'            => $s3Sig,
+        'signature_url'        => $s3Sig,
+        'has_custom_signature' => $sig3Res['is_custom'],
+    ];
+
+    $signatories = [$signatory1, $signatory2, $signatory3];
+
     try {
         // Hard-to-guess file name (stable per member, so the link never changes)
         $token    = substr(hash_hmac('sha256', (string) $profile->id, config('app.key')), 0, 16);
         $relative = 'certificates/certificate_' . $profile->id . '_' . $token . '.pdf';
 
-        // ── DYNAMIC UNIT-SPECIFIC CERTIFICATE LOGO ──
-        $unit          = $profile->unit;
-        $logoDataUrl   = null;
-        $logoPublicUrl = asset('fumma-logo.png');
-        $isCustomLogo  = false;
-
-        if ($unit && $unit->certificate_logo && Storage::disk('public')->exists($unit->certificate_logo)) {
-            $realLogoPath = Storage::disk('public')->path($unit->certificate_logo);
-            $mime         = @mime_content_type($realLogoPath) ?: 'image/png';
-            $logoDataUrl  = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($realLogoPath));
-            $logoPublicUrl = asset('storage/' . $unit->certificate_logo);
-            $isCustomLogo  = true;
-        } else {
-            $defaultLogoPath = public_path('fumma-logo.png');
-            if (file_exists($defaultLogoPath)) {
-                $logoDataUrl = 'data:image/png;base64,' . base64_encode(file_get_contents($defaultLogoPath));
-            }
-        }
-
         $pdf = Pdf::loadView('certificates.membership', [
-            'profile' => $profile,
-            'unit'    => $unit,
-            'logo'    => $logoDataUrl,
+            'profile'  => $profile,
+            'unit'     => $unit,
+            'logo'     => $logoDataUrl,
+            'sealText' => $baseSealName,
+            'sealYear' => $joinedYear,
         ])->setPaper('a4', 'landscape');
 
         // Saved fresh each time, so unit logo/name/date changes always show immediately on the certificate
@@ -885,35 +983,59 @@ public function certificateInfo()
         return ApiResponse::error('Could not generate the certificate. Please try again.', 500);
     }
 
+    $certificateSettings = [
+        'id'                         => $unit->id ?? null,
+        'unit_id'                    => $unit->id ?? null,
+        'unit_name'                  => $unit->name ?? null,
+        'name'                       => $unit->name ?? null,
+        'certificate_logo'           => $logoPublicUrl,
+        'logo'                       => $logoPublicUrl,
+        'is_custom_certificate_logo' => $isCustomLogo,
+        'certificate_seal_text'      => $sealFullText,
+        'seal_text'                  => $sealFullText,
+        'seal_name'                  => $baseSealName,
+        'seal_year'                  => $joinedYear,
+        'seal_full_text'             => $sealFullText,
+        'signatory_1'                => $signatory1,
+        'signatory_2'                => $signatory2,
+        'signatory_3'                => $signatory3,
+        'signatories'                => $signatories,
+        'president_name'             => $s1Name,
+        'president_signature'        => $s1Sig,
+        'secretary_name'             => $s2Name,
+        'secretary_signature'        => $s2Sig,
+        'treasurer_name'             => $s3Name,
+        'treasurer_signature'        => $s3Sig,
+    ];
+
     return ApiResponse::success(
         [
-            'membership_id'   => $profile->membership_id,
-            'message'         => 'Successfully! Now you are a Member Net member.',
-            'certificate_url' => asset('storage/' . $relative),
-            'unit'            => [
-                'id'                         => $unit->id ?? null,
-                'name'                       => $unit->name ?? null,
-                'certificate_logo'           => $logoPublicUrl,
-                'is_custom_certificate_logo' => $isCustomLogo,
-                'certificate_seal_text'      => $unit->certificate_seal_text ?? null,
-                'signatory_1' => [
-                    'name'        => ($unit && $unit->signatory_1_name) ? $unit->signatory_1_name : (($unit && $unit->certificate_president_name) ? $unit->certificate_president_name : 'Tony Pulickal'),
-                    'designation' => ($unit && $unit->signatory_1_title) ? $unit->signatory_1_title : (($unit && ($unit->signatory_1_name || $unit->certificate_president_name)) ? ($unit->name . ' Unit President') : 'State President'),
-                    'signature'   => ($unit && $unit->signatory_1_signature) ? asset('storage/' . $unit->signatory_1_signature) : asset('sign-president.png'),
-                ],
-                'signatory_2' => [
-                    'name'        => ($unit && $unit->signatory_2_name) ? $unit->signatory_2_name : (($unit && $unit->certificate_secretary_name) ? $unit->certificate_secretary_name : 'Shaji Manhar'),
-                    'designation' => ($unit && $unit->signatory_2_title) ? $unit->signatory_2_title : (($unit && ($unit->signatory_2_name || $unit->certificate_secretary_name)) ? ($unit->name . ' Unit Gen. Secretary') : 'State General Secretary'),
-                    'signature'   => ($unit && $unit->signatory_2_signature) ? asset('storage/' . $unit->signatory_2_signature) : asset('sign-secretary.png'),
-                ],
-                'signatory_3' => [
-                    'name'        => ($unit && $unit->signatory_3_name) ? $unit->signatory_3_name : 'Rafi Puthoor',
-                    'designation' => ($unit && $unit->signatory_3_title) ? $unit->signatory_3_title : (($unit && $unit->signatory_3_name) ? ($unit->name . ' Unit Treasurer') : 'State Treasurer'),
-                    'signature'   => ($unit && $unit->signatory_3_signature) ? asset('storage/' . $unit->signatory_3_signature) : asset('sign-treasurer.png'),
-                ],
-                'president_name'             => ($unit && $unit->signatory_1_name) ? $unit->signatory_1_name : ($unit->certificate_president_name ?? null),
-                'secretary_name'             => ($unit && $unit->signatory_2_name) ? $unit->signatory_2_name : ($unit->certificate_secretary_name ?? null),
-            ],
+            'membership_id'              => $profile->membership_id,
+            'message'                    => 'Successfully! Now you are a Member Net member.',
+            'certificate_url'            => asset('storage/' . $relative),
+            'certificate_logo'           => $logoPublicUrl,
+            'logo'                       => $logoPublicUrl,
+            'is_custom_certificate_logo' => $isCustomLogo,
+            'certificate_seal_text'      => $sealFullText,
+            'seal_text'                  => $sealFullText,
+            'seal_name'                  => $baseSealName,
+            'seal_year'                  => $joinedYear,
+            'seal_full_text'             => $sealFullText,
+            'unit_id'                    => $unit->id ?? null,
+            'unit_name'                  => $unit->name ?? null,
+            'signatory_1'                => $signatory1,
+            'signatory_2'                => $signatory2,
+            'signatory_3'                => $signatory3,
+            'signatories'                => $signatories,
+            'president_name'             => $s1Name,
+            'president_signature'        => $s1Sig,
+            'secretary_name'             => $s2Name,
+            'secretary_signature'        => $s2Sig,
+            'treasurer_name'             => $s3Name,
+            'treasurer_signature'        => $s3Sig,
+            'unit'                       => $certificateSettings,
+            'certificate'                => $certificateSettings,
+            'certificate_settings'       => $certificateSettings,
         ],
         'Congratulations! You are now a Member Net member.'
     );

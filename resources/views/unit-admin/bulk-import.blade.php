@@ -156,11 +156,7 @@
       {{ $myUnit->name }}
     </div>
     <div style="font-size:11px;color:var(--text-dim);">
-      All imported members will be automatically assigned to this unit ·
-      {{ $myUnit->district->name }}
-      @unless(\App\Models\State::fixed())
-        · {{ $myUnit->district->state->name }}
-      @endunless
+      All imported members will be automatically assigned to this unit.
     </div>
   </div>
 </div>
@@ -231,7 +227,7 @@
                 border:1px solid rgba(52,211,153,0.2);
                 border-radius:8px;font-size:11.5px;color:var(--green);">
       <i class="fas fa-check-circle" style="margin-right:6px;"></i>
-      <b>Note:</b> No need to fill state/district/unit —
+      <b>Note:</b> No need to fill state/unit —
       all members will be auto-assigned to
       <b>{{ $myUnit->name }}</b>. Profile photos cannot be added via CSV.
     </div>

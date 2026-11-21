@@ -490,11 +490,11 @@
         <i class="fas fa-sync-alt"></i>Renewals
       </a>
 
-      <div class="ns">Branding & Certificate</div>
+      {{-- <div class="ns">Branding & Certificate</div>
       <a class="ni {{ request()->routeIs('unit-admin.certificate*') ? 'active' : '' }}"
          href="{{ route('unit-admin.certificate') }}" onclick="closeSidebar()">
         <i class="fas fa-certificate"></i>Certificate Settings
-      </a>
+      </a> --}}
       {{-- Payments (commented out) --}}
       {{-- <a class="ni {{ request()->routeIs('unit-admin.payments*') ? 'active' : '' }}"
          href="{{ route('unit-admin.payments') }}" onclick="closeSidebar()">

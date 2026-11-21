@@ -151,18 +151,24 @@ class DistrictAdminReportController extends Controller
         $districtId   = $this->myDistrictId();
         $districtName = District::find($districtId)?->name ?? 'district';
 
-        $members  = $this->filteredMembers($request, $districtId, ['user', 'unit', 'district', 'state']);
+        $members  = $this->filteredMembers($request, $districtId, ['user', 'unit.district.state', 'district.state', 'state']);
         $filename = 'eca_' . str_replace(' ', '_', strtolower($districtName)) . '_report_' . now()->format('d_M_Y') . '.csv';
 
         $headers = [
-            'Content-Type'        => 'text/csv',
+            'Content-Type'        => 'text/csv; charset=UTF-8',
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            'Pragma'              => 'no-cache',
+            'Cache-Control'       => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires'             => '0',
         ];
 
-                $showState = !State::fixed(); // hide the State column when Kerala is fixed
+        $showState = !State::fixed(); // hide the State column when Kerala is fixed
 
         $callback = function () use ($members, $showState) {
             $file = fopen('php://output', 'w');
+
+            // Add UTF-8 BOM so Excel opens it with proper encoding
+            fputs($file, "\xEF\xBB\xBF");
 
             $header = [
                 'S.No', 'Name', 'Email', 'Phone',
@@ -174,16 +180,33 @@ class DistrictAdminReportController extends Controller
             fputcsv($file, $header);
 
             foreach ($members as $i => $m) {
+                $joinedDate = $m->joined_date
+                    ? (is_string($m->joined_date) ? date('d M Y', strtotime($m->joined_date)) : $m->joined_date->format('d M Y'))
+                    : '—';
+                $expiryDate = $m->expiry_date
+                    ? (is_string($m->expiry_date) ? date('d M Y', strtotime($m->expiry_date)) : $m->expiry_date->format('d M Y'))
+                    : '—';
+                $registeredOn = $m->created_at
+                    ? $m->created_at->format('d M Y')
+                    : '—';
+
+                $unitName     = $m->unit?->name ?? '—';
+                $districtName = $m->district?->name ?? $m->unit?->district?->name ?? '—';
+                $stateName    = $m->state?->name ?? $m->district?->state?->name ?? $m->unit?->district?->state?->name ?? '—';
+
                 $row = [
                     $i + 1,
-                    $m->user->name ?? '', $m->user->email ?? '', $m->user->phone ?? '',
-                    $m->organization,
+                    $m->user?->name ?? '—',
+                    $m->user?->email ?? '',
+                    $m->user?->phone ?? '—',
+                    $m->organization ?? '—',
                     $m->membership_id ?? '—',
-                    $m->status,
-                    $m->unit->name ?? '—', $m->district->name ?? '—',
+                    $m->status ?? '—',
+                    $unitName,
+                    $districtName,
                 ];
-                if ($showState) $row[] = $m->state->name ?? '—';
-                array_push($row, $m->joined_date ?? '—', $m->expiry_date ?? '—', $m->created_at->format('d M Y'));
+                if ($showState) $row[] = $stateName;
+                array_push($row, $joinedDate, $expiryDate, $registeredOn);
                 fputcsv($file, $row);
             }
             fclose($file);

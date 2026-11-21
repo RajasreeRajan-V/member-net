@@ -4,17 +4,32 @@
     $hasGd = extension_loaded('gd');
 
     $resolveSignDataUrl = function ($customStoragePath, $defaultPublicFile) use ($hasGd) {
-        if (!$hasGd) return null;
-        if ($customStoragePath && \Illuminate\Support\Facades\Storage::disk('public')->exists($customStoragePath)) {
-            $path = \Illuminate\Support\Facades\Storage::disk('public')->path($customStoragePath);
-            $mime = @mime_content_type($path) ?: 'image/png';
-            return 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($path));
+        if ($customStoragePath) {
+            $cleanPath = ltrim(preg_replace('#^/?storage/#', '', $customStoragePath), '/');
+            $fullPath = null;
+            if (\Illuminate\Support\Facades\Storage::disk('public')->exists($cleanPath)) {
+                $fullPath = \Illuminate\Support\Facades\Storage::disk('public')->path($cleanPath);
+            } elseif (file_exists(public_path('storage/' . $cleanPath))) {
+                $fullPath = public_path('storage/' . $cleanPath);
+            } elseif (file_exists(storage_path('app/public/' . $cleanPath))) {
+                $fullPath = storage_path('app/public/' . $cleanPath);
+            }
+            if ($fullPath && file_exists($fullPath)) {
+                $mime = @mime_content_type($fullPath) ?: 'image/png';
+                $isJpeg = in_array(strtolower(pathinfo($fullPath, PATHINFO_EXTENSION)), ['jpg', 'jpeg']) || str_contains($mime, 'jpeg');
+                if ($hasGd || $isJpeg) {
+                    return 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($fullPath));
+                }
+            }
         }
         if ($defaultPublicFile) {
             $path = public_path($defaultPublicFile);
             if (file_exists($path)) {
                 $mime = @mime_content_type($path) ?: 'image/png';
-                return 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($path));
+                $isJpeg = in_array(strtolower(pathinfo($path, PATHINFO_EXTENSION)), ['jpg', 'jpeg']) || str_contains($mime, 'jpeg');
+                if ($hasGd || $isJpeg) {
+                    return 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($path));
+                }
             }
         }
         return null;
@@ -40,6 +55,16 @@
         ['name' => $s2Name, 'title' => $s2Title, 'img' => $s2Img],
         ['name' => $s3Name, 'title' => $s3Title, 'img' => $s3Img],
     ];
+
+    // Determine seal top text (Unit Name replaces "Member Net")
+    $effectiveSealText = $sealText ?? (($unitObj && !empty($unitObj->certificate_seal_text) && trim($unitObj->certificate_seal_text) !== 'Member Net') ? $unitObj->certificate_seal_text : ($unitObj->name ?? 'Member Net'));
+    $effectiveSealYear = $sealYear ?? $joined->format('Y');
+
+    // Strip redundant trailing year from top text so it doesn't show year twice in the seal circle
+    $displaySealText = trim(preg_replace('/\s*' . preg_quote($effectiveSealYear, '/') . '$/i', '', $effectiveSealText));
+    if (empty($displaySealText)) {
+        $displaySealText = $unitObj->name ?? 'Member Net';
+    }
 @endphp
 <!DOCTYPE html>
 <html>
@@ -139,11 +164,11 @@
     <div class="memno">Membership No: <span>{{ $profile->membership_id }}</span></div>
 
     <div class="logo">
-        @if($logo && $hasGd)
+        @if($logo)
             <img src="{{ $logo }}">
         @else
             <div class="logo-text" style="font-size:24px;font-weight:bold;color:#14213d;letter-spacing:1px;padding-top:12px;">
-                {{ $unitObj->name ?? 'FuMMA' }}
+                {{ $unitObj->name ?? 'Member Net' }}
             </div>
         @endif
     </div>
@@ -165,7 +190,7 @@
         </div>
 
         <div class="place">
-            Unit: {{ $profile->unit->name ?? '' }}
+            Unit: {{ $unitObj->name ?? $profile->unit->name ?? '' }}
         </div>
     </div>
 
@@ -199,14 +224,14 @@
 
     <div class="seal">
         <div class="seal-in">
-            <div class="seal-t1">{{ ($unitObj && $unitObj->certificate_seal_text) ? $unitObj->certificate_seal_text : 'Member Net' }}</div>
-            <div class="seal-yr">{{ $joined->format('Y') }}</div>
+            <div class="seal-t1">{{ $displaySealText }}</div>
+            <div class="seal-yr">{{ $effectiveSealYear }}</div>
             <div class="seal-t2">MEMBER</div>
         </div>
     </div>
 
     <div class="assoc">
-        FURNITURE MANUFACTURERS &amp; MERCHANTS WELFARE ASSOCIATION
+        MEMBER NET ASSOCIATION
     </div>
 
 </div>

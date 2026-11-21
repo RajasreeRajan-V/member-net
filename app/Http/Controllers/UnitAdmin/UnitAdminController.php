@@ -10,7 +10,6 @@ use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Models\UnitAdmin;
 use App\Models\Unit;
-use App\Models\District;
 use App\Models\State;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -39,7 +38,7 @@ class UnitAdminController extends Controller
     public function dashboard()
     {
         $unitId = $this->myUnitId();
-        $unit   = \App\Models\Unit::with('district.state')->find($unitId);
+        $unit   = \App\Models\Unit::find($unitId);
         $base   = \App\Models\MemberProfile::where('unit_id', $unitId);
 
         $unitUserIds = (clone $base)->pluck('user_id');
@@ -85,7 +84,7 @@ class UnitAdminController extends Controller
     public function members(Request $request)
     {
         $unitId = $this->myUnitId();
-        $query  = MemberProfile::with(['user', 'unit', 'district', 'state'])
+        $query  = MemberProfile::with(['user', 'unit', 'state'])
                     ->where('unit_id', $unitId);
 
         if ($request->filled('search')) {
@@ -106,7 +105,7 @@ class UnitAdminController extends Controller
             'status'           => $request->status,
             'membership_type'  => $request->membership_type,
             'search'           => $request->search,
-            'myUnit'           => \App\Models\Unit::with('district.state')->find($unitId),
+            'myUnit'           => \App\Models\Unit::find($unitId),
         ]);
     }
 
@@ -143,7 +142,7 @@ class UnitAdminController extends Controller
         // Email is optional: always store NULL (never '') so the unique index is safe
         $email = trim((string) $request->email) !== '' ? trim($request->email) : null;
 
-        $unitAdmin = UnitAdmin::with('unit.district')->where('user_id', Auth::id())->first();
+        $unitAdmin = UnitAdmin::with('unit')->where('user_id', Auth::id())->first();
 
         // ── Ask FUMMA whether this phone is an active FUMMA member ──
         // Done before the DB transaction so the HTTP call never holds it open.
@@ -965,7 +964,7 @@ class UnitAdminController extends Controller
     {
         $event = Event::where('id', $id)->where('created_by', Auth::id())->firstOrFail();
 
-        $profiles = MemberProfile::with(['unit', 'district'])
+        $profiles = MemberProfile::with('unit')
             ->where('unit_id', $this->myUnitId())
             ->get()
             ->keyBy('user_id');
@@ -1017,7 +1016,7 @@ class UnitAdminController extends Controller
     public function bulkImport()
     {
         $unitId = $this->myUnitId();
-        $unit   = \App\Models\Unit::with('district.state')->find($unitId);
+        $unit   = \App\Models\Unit::find($unitId);
 
         return view('unit-admin.bulk-import', [
             'myUnit' => $unit,
@@ -1169,7 +1168,7 @@ class UnitAdminController extends Controller
             $isFummaMember = app(\App\Services\FummaMemberService::class)->isActive($data['phone']) ? 1 : 0;
 
             try {
-                $profile = \Illuminate\Support\Facades\DB::transaction(function () use ($data, $email, $dob, $unitId, $districtId, $stateId, $isFummaMember) {
+                $profile = \Illuminate\Support\Facades\DB::transaction(function () use ($data, $email, $dob, $unitId, $isFummaMember) {
                     // Purge soft-deleted conflicting accounts if any
                     if ($email) {
                         $conflicting = \App\Models\User::withTrashed()->where('email', $email)->first();
@@ -1261,7 +1260,7 @@ class UnitAdminController extends Controller
         $unitUserIds = \App\Models\MemberProfile::where('unit_id', $unitId)
                         ->pluck('user_id');
 
-        $query = Payment::with(['user', 'memberProfile.unit', 'memberProfile.district'])
+        $query = Payment::with(['user', 'memberProfile.unit'])
                     ->whereIn('user_id', $unitUserIds)
                     ->latest();
 
@@ -1272,7 +1271,7 @@ class UnitAdminController extends Controller
 
         $payments = $query->get();
 
-        $unit = \App\Models\Unit::with('district.state')->find($unitId);
+        $unit = \App\Models\Unit::find($unitId);
 
         return view('unit-admin.payments', [
             'payments'       => $payments,
@@ -2369,7 +2368,7 @@ class UnitAdminController extends Controller
     {
         $this->ensureCertificateColumnsExist();
         $unitId = $this->myUnitId();
-        $unit   = \App\Models\Unit::with('district.state')->findOrFail($unitId);
+        $unit   = \App\Models\Unit::findOrFail($unitId);
 
         return view('unit-admin.certificate', compact('unit'));
     }
@@ -2475,7 +2474,7 @@ class UnitAdminController extends Controller
     {
         $this->ensureCertificateColumnsExist();
         $unitId = $this->myUnitId();
-        $unit   = \App\Models\Unit::with('district.state')->findOrFail($unitId);
+        $unit   = \App\Models\Unit::findOrFail($unitId);
 
         $sampleProfile = MemberProfile::with('user')->where('unit_id', $unitId)->first();
         if (!$sampleProfile) {
@@ -2500,11 +2499,18 @@ class UnitAdminController extends Controller
             }
         }
 
+        $joinedYear   = date('Y');
+        $baseSealName = (!empty($unit->certificate_seal_text) && trim($unit->certificate_seal_text) !== 'Member Net')
+            ? trim($unit->certificate_seal_text)
+            : ($unit->name ?? 'Member Net');
+
         try {
             $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('certificates.membership', [
-                'profile' => $sampleProfile,
-                'unit'    => $unit,
-                'logo'    => $logoDataUrl,
+                'profile'  => $sampleProfile,
+                'unit'     => $unit,
+                'logo'     => $logoDataUrl,
+                'sealText' => $baseSealName,
+                'sealYear' => $joinedYear,
             ])->setPaper('a4', 'landscape');
 
             return $pdf->stream('sample_certificate_' . strtolower(preg_replace('/[^A-Za-z0-9]/', '_', $unit->name)) . '.pdf');

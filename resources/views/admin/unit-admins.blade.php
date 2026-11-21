@@ -51,7 +51,7 @@
           <td style="color:var(--text-dim)">{{ $ua->user->phone }}</td>
           <td><span class="utag">{{ $ua->unit->name }}</span></td>
           <td style="color:var(--text-dim)">
-            {{ $ua->unit->district->name }}
+            {{ $ua->unit?->district?->name ?? '—' }}
           </td>
           <td>
             <span class="badge {{ $ua->user->is_active ? 'bac' : 'brj' }}">
@@ -183,7 +183,7 @@
               <option value="{{ $unit->id }}"
                 @selected(old('form') === 'create' && old('unit_id') == $unit->id)>
                 {{ $unit->name }}
-                ({{ $unit->district->name }})
+                @if($unit->district)({{ $unit->district->name }})@endif
               </option>
             @endforeach
           </select>
@@ -270,7 +270,7 @@
             @foreach(\App\Models\Unit::with('district')->orderBy('name')->get() as $unit)
               <option value="{{ $unit->id }}"
                 @selected(old('form') === 'edit' && old('unit_id') == $unit->id)>
-                {{ $unit->name }} ({{ $unit->district->name }})
+                {{ $unit->name }}@if($unit->district) ({{ $unit->district->name }})@endif
               </option>
             @endforeach
           </select>

@@ -30,7 +30,7 @@ class UnitAdminReportController extends Controller
     public function index()
     {
         $unitId = $this->myUnitId();
-        $unit   = Unit::with('district.state')->find($unitId);
+        $unit   = Unit::find($unitId);
         $userId = Auth::id();
 
         $unitUserIds = $this->unitUserIds($unitId);
@@ -125,7 +125,7 @@ class UnitAdminReportController extends Controller
     public function preview(Request $request)
     {
         $unitId = $this->myUnitId();
-        $query  = MemberProfile::with(['user', 'unit', 'district', 'state'])
+        $query  = MemberProfile::with(['user', 'unit', 'state'])
                     ->where('unit_id', $unitId);
 
         if ($request->filled('status'))    $query->where('status', $request->status);
@@ -139,13 +139,13 @@ class UnitAdminReportController extends Controller
         return response()->json([
             'count'   => $members->count(),
             'members' => $members->map(fn($m) => [
-                'name'            => $m->user->name,
-                'email'           => $m->user->email,
-                'phone'           => $m->user->phone,
-                'organization'    => $m->organization,
+                'name'            => $m->user?->name ?? '—',
+                'email'           => $m->user?->email ?? '',
+                'phone'           => $m->user?->phone ?? '—',
+                'organization'    => $m->organization ?? '—',
                 'membership_id'   => $m->membership_id ?? '—',
-                'status'          => $m->status,
-                'registered_on'   => $m->created_at->format('d M Y'),
+                'status'          => $m->status ?? '—',
+                'registered_on'   => $m->created_at?->format('d M Y') ?? '—',
                 'profile_image'   => $m->photo ? asset('storage/' . $m->photo) : null,
             ]),
         ]);
@@ -160,7 +160,7 @@ class UnitAdminReportController extends Controller
         $unit     = Unit::find($unitId);
         $unitName = $unit?->name ?? 'unit';
 
-        $query = MemberProfile::with(['user', 'district', 'state'])
+        $query = MemberProfile::with(['user', 'state', 'unit'])
                     ->where('unit_id', $unitId);
 
         if ($request->filled('status'))    $query->where('status', $request->status);
@@ -173,35 +173,54 @@ class UnitAdminReportController extends Controller
         $filename = 'eca_' . str_replace(' ', '_', strtolower($unitName)) . '_report_' . now()->format('d_M_Y') . '.csv';
 
         $headers = [
-            'Content-Type'        => 'text/csv',
+            'Content-Type'        => 'text/csv; charset=UTF-8',
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            'Pragma'              => 'no-cache',
+            'Cache-Control'       => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires'             => '0',
         ];
 
-                $showState = !State::fixed(); // hide the State column when Kerala is fixed
+        $showState = !State::fixed(); // hide the State column when Kerala is fixed
 
-        $callback = function () use ($members, $showState) {
+        $callback = function () use ($members, $showState, $unit) {
             $file = fopen('php://output', 'w');
+
+            // Add UTF-8 BOM so Excel opens it with proper encoding
+            fputs($file, "\xEF\xBB\xBF");
 
             $header = [
                 'S.No', 'Name', 'Email', 'Phone',
                 'Organization', 'Membership ID',
-                'Status', 'District',
+                'Status',
             ];
             if ($showState) $header[] = 'State';
             array_push($header, 'Joined Date', 'Expiry Date', 'Registered On');
             fputcsv($file, $header);
 
             foreach ($members as $i => $m) {
+                $joinedDate = $m->joined_date
+                    ? (is_string($m->joined_date) ? date('d M Y', strtotime($m->joined_date)) : $m->joined_date->format('d M Y'))
+                    : '—';
+                $expiryDate = $m->expiry_date
+                    ? (is_string($m->expiry_date) ? date('d M Y', strtotime($m->expiry_date)) : $m->expiry_date->format('d M Y'))
+                    : '—';
+                $registeredOn = $m->created_at
+                    ? $m->created_at->format('d M Y')
+                    : '—';
+
+                $stateName = $m->state?->name ?? '—';
+
                 $row = [
                     $i + 1,
-                    $m->user->name, $m->user->email, $m->user->phone,
-                    $m->organization,
+                    $m->user?->name ?? '—',
+                    $m->user?->email ?? '',
+                    $m->user?->phone ?? '—',
+                    $m->organization ?? '—',
                     $m->membership_id ?? '—',
-                    $m->status,
-                    $m->district->name,
+                    $m->status ?? '—',
                 ];
-                if ($showState) $row[] = $m->state->name;
-                array_push($row, $m->joined_date ?? '—', $m->expiry_date ?? '—', $m->created_at->format('d M Y'));
+                if ($showState) $row[] = $stateName;
+                array_push($row, $joinedDate, $expiryDate, $registeredOn);
                 fputcsv($file, $row);
             }
             fclose($file);

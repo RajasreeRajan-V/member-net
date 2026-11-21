@@ -14,7 +14,7 @@ class DashboardController extends Controller
     public function index()
     {
         $user    = auth()->user();
-        $profile = MemberProfile::with(['unit','district','state'])
+        $profile = MemberProfile::with(['unit', 'state'])
                     ->where('user_id', $user->id)->first();
 
         if (!$profile) {
@@ -112,7 +112,6 @@ $news = $visibility->news($user->id)
                                        ? asset('storage/'.$profile->photo)
                                        : '',
                 'unit_name'       => $profile->unit->name ?? '',
-                'district_name'   => $profile->district->name ?? '',
                 'joined_date'     => $profile->joined_date
                                        ? Carbon::parse($profile->joined_date)->format('d M Y')
                                        : '',

@@ -64,7 +64,6 @@ class UnitAdminApiController extends Controller
             'status'        => $p->status,
             'photo'         => $p->photo ? asset('storage/' . $p->photo) : null,
             'unit_name'     => $p->unit->name ?? null,
-            'district_name' => $p->district->name ?? null,
             'state_name'    => $p->state->name ?? null,
             'joined_date'   => $p->joined_date,
             'registered_on' => $p->created_at->format('d M Y'),
@@ -93,7 +92,7 @@ class UnitAdminApiController extends Controller
     // ─────────────────────────────────
     private function buildMemberQuery(Request $request, int $unitId, ?string $status = null)
     {
-        $query = MemberProfile::with(['user', 'unit', 'district', 'state'])
+        $query = MemberProfile::with(['user', 'unit', 'state'])
             ->where('unit_id', $unitId)
             ->latest();
 
@@ -177,14 +176,13 @@ public function registerMember(Request $request)
         return ApiResponse::error('No registration fee configured. Contact admin.', 400);
     }
 
-    // ── Resolve unit → district → state from unit admin's unit ──
-    $unit = \App\Models\Unit::with('district.state')->find($unitAdmin->unit_id);
-    if (!$unit || !$unit->district) {
+    // ── Resolve unit from unit admin's unit ──
+    $unit = \App\Models\Unit::find($unitAdmin->unit_id);
+    if (!$unit) {
         return ApiResponse::error('Unit configuration is incomplete. Contact super admin.', 500);
     }
 
-    $district = $unit->district;
-    $state    = $unit->district->state;
+    $state = \App\Models\State::fixed() ?? \App\Models\State::first();
 
     // ── Handle photo (base64, required) ──
     $raw   = preg_replace('#^data:image/\w+;base64,#i', '', $request->photo);
@@ -220,7 +218,7 @@ public function registerMember(Request $request)
 
     // ── Create user + profile + approve, all atomically ──
     try {
-        [$user, $profile] = \Illuminate\Support\Facades\DB::transaction(function () use ($request, $fee, $email, $unit, $district, $state, $photoPath) {
+        [$user, $profile] = \Illuminate\Support\Facades\DB::transaction(function () use ($request, $fee, $email, $unit, $state, $photoPath) {
             $user = User::create([
                 'name'      => $request->name,
                 'email'     => $email,
@@ -235,8 +233,7 @@ public function registerMember(Request $request)
                 'fee_id'          => $fee->id,
                 'plan_id'         => null,
                 'unit_id'         => $unit->id,
-                'district_id'     => $district->id,
-                'state_id'        => $state->id,
+                'state_id'        => $state?->id,
                 'status'          => 'PENDING',
                 'dob'             => $request->dob,
                 'organization'    => $request->organization,
@@ -299,8 +296,7 @@ public function registerMember(Request $request)
         'joined_date'     => $profile->joined_date,
         'photo'           => asset('storage/' . $photoPath),
         'unit_name'       => $unit->name,
-        'district_name'   => $district->name,
-        'state_name'      => $state->name,
+        'state_name'      => $state?->name,
         'email_sent'      => $emailSent,
     ], $message, 201);
 }
@@ -471,7 +467,7 @@ public function deleteMember(Request $request)
 
         $request->validate(['id' => 'required|exists:member_profiles,id']);
 
-        $p = MemberProfile::with(['user', 'unit', 'district', 'state'])->find($request->id);
+        $p = MemberProfile::with(['user', 'unit', 'state'])->find($request->id);
 
         if ((int) $p->unit_id !== (int) $unitAdmin->unit_id) {
             return ApiResponse::error('Access denied. This member does not belong to your unit.', 403);
@@ -592,7 +588,7 @@ public function deleteMember(Request $request)
     {
         if (!$this->isUnitAdmin()) return $this->unauthorised();
 
-        $unitAdmin = UnitAdmin::with(['user', 'unit.district.state'])
+        $unitAdmin = UnitAdmin::with(['user', 'unit'])
                               ->where('user_id', auth()->id())
                               ->first();
 
@@ -608,10 +604,8 @@ public function deleteMember(Request $request)
                 'phone' => $unitAdmin->user->phone,
             ],
             'unit' => [
-                'id'       => (string) $unitAdmin->unit_id,
-                'name'     => $unitAdmin->unit->name ?? null,
-                'district' => $unitAdmin->unit->district->name ?? null,
-                'state'    => $unitAdmin->unit->district->state->name ?? null,
+                'id'   => (string) $unitAdmin->unit_id,
+                'name' => $unitAdmin->unit->name ?? null,
             ],
             'member_counts' => [
                 'total'    => MemberProfile::where('unit_id', $unitId)->count(),

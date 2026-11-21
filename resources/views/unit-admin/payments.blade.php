@@ -19,8 +19,7 @@
       {{ $unit->name ?? 'Your Unit' }} — Payments
     </div>
     <div style="font-size:11px;color:var(--text-dim);margin-top:2px;">
-      {{ $unit->district->name ?? '' }} · {{ $unit->district->state->name ?? '' }}
-      &nbsp;·&nbsp; All payments from your unit members
+      All payments from your unit members
     </div>
   </div>
 </div>
@@ -256,7 +255,6 @@
                    '{{ $p->transaction_id ?? '—' }}',
                    '{{ $p->membership_id ?? '—' }}',
                    '{{ $p->memberProfile->unit->name ?? '—' }}',
-                   '{{ $p->memberProfile->district->name ?? '—' }}',
                    '{{ $p->paid_at ? \Carbon\Carbon::parse($p->paid_at)->format('d M Y h:i A') : '—' }}',
                    '{{ $p->created_at->format('d M Y h:i A') }}',
                    '{{ addslashes($p->notes ?? '') }}',
@@ -322,10 +320,6 @@
           <div>
             <div style="font-size:10px;color:var(--text-dim);">Unit</div>
             <div id="vUnit" style="font-size:12px;"></div>
-          </div>
-          <div>
-            <div style="font-size:10px;color:var(--text-dim);">District</div>
-            <div id="vDistrict" style="font-size:12px;"></div>
           </div>
         </div>
       </div>
@@ -477,9 +471,9 @@ function renderTable() {
   document.getElementById('footerAmount').textContent = 'Shown revenue: ₹' + totalAmount.toLocaleString('en-IN');
 }
 
-// ── photo is the new 17th argument ──
+// ── photo is the 16th argument ──
 function viewPayment(name, email, phone, planName, planType, payType, amount, currency,
-                     status, txnId, midId, unit, district, paidAt, createdAt, notes, photo) {
+                     status, txnId, midId, unit, paidAt, createdAt, notes, photo) {
 
   // ── Avatar: show photo if available, else initials ──
   const avatarEl = document.getElementById('vAvatar');
@@ -499,7 +493,6 @@ function viewPayment(name, email, phone, planName, planType, payType, amount, cu
   document.getElementById('vEmail').textContent     = email;
   document.getElementById('vPhone').textContent     = phone;
   document.getElementById('vUnit').textContent      = unit;
-  document.getElementById('vDistrict').textContent  = district;
   document.getElementById('vAmount').textContent    = '₹' + amount;
   document.getElementById('vPlan').textContent      = planName + ' (' + planType + ')';
   document.getElementById('vType').textContent      = payType;

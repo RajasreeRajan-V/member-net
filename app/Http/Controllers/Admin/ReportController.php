@@ -103,7 +103,7 @@ class ReportController extends Controller
     // ─────────────────────────────────
     public function preview(Request $request)
     {
-        $query = MemberProfile::with(['user', 'unit', 'district', 'state']);
+        $query = MemberProfile::with(['user', 'unit.district.state', 'district.state', 'state']);
 
         if ($request->filled('state_id'))        $query->where('state_id', $request->state_id);
         if ($request->filled('district_id'))     $query->where('district_id', $request->district_id);
@@ -120,17 +120,17 @@ class ReportController extends Controller
         return response()->json([
             'count'   => $members->count(),
             'members' => $members->map(fn($m) => [
-                'name'            => $m->user->name,
-                'email'           => $m->user->email,
-                'phone'           => $m->user->phone,
-                'organization'    => $m->organization,
-                'unit'            => $m->unit->name,
-                'district'        => $m->district->name,
-                'state'           => $m->state->name,
-                'membership_type' => $m->membership_type,
+                'name'            => $m->user?->name ?? '—',
+                'email'           => $m->user?->email ?? '',
+                'phone'           => $m->user?->phone ?? '—',
+                'organization'    => $m->organization ?? '—',
+                'unit'            => $m->unit?->name ?? '—',
+                'district'        => $m->district?->name ?? $m->unit?->district?->name ?? '—',
+                'state'           => $m->state?->name ?? $m->district?->state?->name ?? $m->unit?->district?->state?->name ?? '—',
+                'membership_type' => $m->membership_type ?? '—',
                 'membership_id'   => $m->membership_id ?? '—',
-                'status'          => $m->status,
-                'registered_on'   => $m->created_at->format('d M Y'),
+                'status'          => $m->status ?? '—',
+                'registered_on'   => $m->created_at?->format('d M Y') ?? '—',
                 'profile_image'   => $m->photo ? asset('storage/' . $m->photo) : null,
             ]),
         ]);
@@ -141,7 +141,7 @@ class ReportController extends Controller
     // ─────────────────────────────────
     public function download(Request $request)
     {
-        $query = MemberProfile::with(['user', 'unit', 'district', 'state']);
+        $query = MemberProfile::with(['user', 'unit.district.state', 'district.state', 'state']);
 
         if ($request->filled('status'))          $query->where('status', $request->status);
         if ($request->filled('membership_type')) $query->where('membership_type', $request->membership_type);
@@ -157,14 +157,20 @@ class ReportController extends Controller
         $filename = 'eca_members_report_' . now()->format('d_M_Y') . '.csv';
 
         $headers = [
-            'Content-Type'        => 'text/csv',
+            'Content-Type'        => 'text/csv; charset=UTF-8',
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            'Pragma'              => 'no-cache',
+            'Cache-Control'       => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires'             => '0',
         ];
 
-                $showState = !State::fixed(); // hide the State column when Kerala is fixed
+        $showState = !State::fixed(); // hide the State column when Kerala is fixed
 
         $callback = function () use ($members, $showState) {
             $file = fopen('php://output', 'w');
+
+            // Add UTF-8 BOM so Excel opens it with proper encoding
+            fputs($file, "\xEF\xBB\xBF");
 
             $header = [
                 'S.No', 'Name', 'Email', 'Phone',
@@ -177,22 +183,36 @@ class ReportController extends Controller
             fputcsv($file, $header);
 
             foreach ($members as $i => $m) {
+                $joinedDate = $m->joined_date
+                    ? (is_string($m->joined_date) ? date('d M Y', strtotime($m->joined_date)) : $m->joined_date->format('d M Y'))
+                    : '—';
+                $expiryDate = $m->expiry_date
+                    ? (is_string($m->expiry_date) ? date('d M Y', strtotime($m->expiry_date)) : $m->expiry_date->format('d M Y'))
+                    : '—';
+                $registeredOn = $m->created_at
+                    ? $m->created_at->format('d M Y')
+                    : '—';
+
+                $unitName     = $m->unit?->name ?? '—';
+                $districtName = $m->district?->name ?? $m->unit?->district?->name ?? '—';
+                $stateName    = $m->state?->name ?? $m->district?->state?->name ?? $m->unit?->district?->state?->name ?? '—';
+
                 $row = [
                     $i + 1,
-                    $m->user->name,
-                    $m->user->email,
-                    $m->user->phone,
-                    $m->organization,
-                    $m->designation,
-                    $m->experience . ' yrs',
-                    $m->membership_type,
+                    $m->user?->name ?? '—',
+                    $m->user?->email ?? '',
+                    $m->user?->phone ?? '—',
+                    $m->organization ?? '—',
+                    $m->designation ?? '—',
+                    ($m->experience !== null && $m->experience !== '') ? ($m->experience . ' yrs') : '—',
+                    $m->membership_type ?? '—',
                     $m->membership_id ?? '—',
-                    $m->status,
-                    $m->unit->name,
-                    $m->district->name,
+                    $m->status ?? '—',
+                    $unitName,
+                    $districtName,
                 ];
-                if ($showState) $row[] = $m->state->name;
-                array_push($row, $m->joined_date ?? '—', $m->expiry_date ?? '—', $m->created_at->format('d M Y'));
+                if ($showState) $row[] = $stateName;
+                array_push($row, $joinedDate, $expiryDate, $registeredOn);
                 fputcsv($file, $row);
             }
 

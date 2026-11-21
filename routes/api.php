@@ -49,6 +49,20 @@ Route::get('/run-certificate-migrations', function () {
                 }
             }
         });
+
+        try {
+            \Illuminate\Support\Facades\Schema::table('units', function (\Illuminate\Database\Schema\Blueprint $table) {
+                $table->dropForeign('units_district_id_foreign');
+            });
+        } catch (\Throwable $e) {}
+
+        try {
+            \Illuminate\Support\Facades\Schema::table('units', function (\Illuminate\Database\Schema\Blueprint $table) {
+                $table->unsignedBigInteger('district_id')->nullable()->default(null)->change();
+                $table->foreign('district_id')->references('id')->on('districts')->nullOnDelete();
+            });
+        } catch (\Throwable $e) {}
+
         return response()->json([
             'status'  => 'success',
             'message' => "All certificate and signatory columns exist in 'units' table!",
