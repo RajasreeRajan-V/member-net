@@ -349,6 +349,7 @@ Route::delete('/renewals-manage',           [RenewalController::class, 'destroy'
 Route::get('/renewals-manage/{id}/detail',  [RenewalController::class, 'detail'])->name('renewals-manage.detail');
 
 Route::get('/monthly-fee', [AdminController::class, 'monthlyFee'])->name('monthly-fee');
+Route::get('/monthly-fee/paid', [AdminController::class, 'paidMonthlyFees'])->name('monthly-fee.paid');
 Route::put('/monthly-fee', [AdminController::class, 'updateMonthlyFee'])->name('monthly-fee.update');
 
 Route::get('/expenses', [AdminController::class, 'expenses'])->name('expenses');

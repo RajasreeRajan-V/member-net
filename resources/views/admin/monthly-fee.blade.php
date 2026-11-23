@@ -9,6 +9,9 @@
       <div class="ct">
         <i class="fas fa-calendar-check"></i>Monthly Membership Fee
       </div>
+      <a href="{{ route('admin.monthly-fee.paid') }}" class="btn bo bsm">
+        <i class="fas fa-user-check"></i>View Paid Members
+      </a>
     </div>
 
     <form method="POST" action="{{ route('admin.monthly-fee.update') }}">

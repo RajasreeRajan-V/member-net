@@ -3283,6 +3283,163 @@ public function updateMember(Request $request)
         return back()->with('success', 'Monthly fee updated! This applies to dues generated from now on — dues already created for the current month keep their old amount.');
     }
 
+    public function paidMonthlyFees(Request $request)
+    {
+        $query = \App\Models\MonthlyFeeDue::with(['memberProfile.user', 'memberProfile.unit'])
+            ->where('status', 'PAID');
+
+        // Search by Member Name, Phone, Email, or Membership ID
+        if ($search = trim($request->get('search', ''))) {
+            $query->whereHas('memberProfile', function ($q) use ($search) {
+                $q->where('membership_id', 'like', "%{$search}%")
+                  ->orWhereHas('user', function ($uq) use ($search) {
+                      $uq->where('name', 'like', "%{$search}%")
+                         ->orWhere('email', 'like', "%{$search}%")
+                         ->orWhere('phone', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        // Filter by Unit
+        if ($unitId = $request->get('unit_id')) {
+            $query->whereHas('memberProfile', function ($q) use ($unitId) {
+                $q->where('unit_id', $unitId);
+            });
+        }
+
+        // Filter by Month-Year (e.g. '2026-11')
+        if ($monthYear = $request->get('month_year')) {
+            $query->where('month_year', $monthYear);
+        }
+
+        // Filter by Paid Date Range
+        if ($dateFrom = $request->get('date_from')) {
+            $query->whereDate('paid_date', '>=', $dateFrom);
+        }
+        if ($dateTo = $request->get('date_to')) {
+            $query->whereDate('paid_date', '<=', $dateTo);
+        }
+
+        // Export CSV check
+        if ($request->get('export') === 'csv') {
+            return $this->exportPaidMonthlyFeesCsv($query->latest('paid_date')->latest('id')->get());
+        }
+
+        // Summary KPI statistics (computed across all paid records)
+        $currentMonth = Carbon::now()->format('Y-m');
+        $allPaidQuery = \App\Models\MonthlyFeeDue::where('status', 'PAID');
+
+        $stats = [
+            'total_amount'       => (clone $allPaidQuery)->sum('amount'),
+            'total_count'        => (clone $allPaidQuery)->count(),
+            'distinct_members'   => (clone $allPaidQuery)->distinct('member_profile_id')->count('member_profile_id'),
+            'this_month_amount'  => (clone $allPaidQuery)->where('month_year', $currentMonth)->sum('amount'),
+            'this_month_count'   => (clone $allPaidQuery)->where('month_year', $currentMonth)->count(),
+        ];
+
+        // Paginate records
+        $dues = $query->latest('paid_date')->latest('id')->paginate(20)->withQueryString();
+
+        // Attach payment transactions for display (payment method, ref / gateway tx)
+        $mfIds = $dues->pluck('id')->map(fn($id) => 'mf' . $id)->toArray();
+        $transactions = \App\Models\PaymentTransaction::whereIn('reference_id', $mfIds)
+            ->get()
+            ->keyBy('reference_id');
+
+        foreach ($dues as $due) {
+            $due->payment_transaction = $transactions['mf' . $due->id] ?? null;
+        }
+
+        // Dropdown data
+        $units = Unit::orderBy('name')->get();
+        $availableMonths = \App\Models\MonthlyFeeDue::where('status', 'PAID')
+            ->select('month_year')
+            ->whereNotNull('month_year')
+            ->distinct()
+            ->orderByDesc('month_year')
+            ->pluck('month_year');
+
+        return view('admin.monthly-fee-paid', compact('dues', 'stats', 'units', 'availableMonths'));
+    }
+
+    private function exportPaidMonthlyFeesCsv($records)
+    {
+        $filename = 'paid_monthly_fees_' . date('Ymd_His') . '.csv';
+
+        $mfIds = $records->pluck('id')->map(fn($id) => 'mf' . $id)->toArray();
+        $transactions = \App\Models\PaymentTransaction::whereIn('reference_id', $mfIds)
+            ->get()
+            ->keyBy('reference_id');
+
+        $headers = [
+            'Content-Type'        => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            'Pragma'              => 'no-cache',
+            'Cache-Control'       => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires'             => '0',
+        ];
+
+        $columns = [
+            'SL No',
+            'Membership ID',
+            'Member Name',
+            'Email',
+            'Phone',
+            'Unit',
+            'Fee Month',
+            'Amount (INR)',
+            'Status',
+            'Paid Date',
+            'Payment Method',
+            'Transaction ID',
+        ];
+
+        $callback = function () use ($records, $transactions, $columns) {
+            $file = fopen('php://output', 'w');
+            fprintf($file, chr(0xEF) . chr(0xBB) . chr(0xBF)); // UTF-8 BOM
+            fputcsv($file, $columns);
+
+            $sl = 1;
+            foreach ($records as $due) {
+                $profile = $due->memberProfile;
+                $user    = $profile?->user;
+                $tx      = $transactions['mf' . $due->id] ?? null;
+
+                $feeMonth = '—';
+                if ($due->month_year) {
+                    try {
+                        $feeMonth = Carbon::createFromFormat('Y-m', $due->month_year)->format('M Y');
+                    } catch (\Throwable $e) {
+                        $feeMonth = $due->month_year;
+                    }
+                } elseif ($due->due_date) {
+                    $feeMonth = Carbon::parse($due->due_date)->format('M Y');
+                }
+
+                $paidDate = $due->paid_date ? Carbon::parse($due->paid_date)->format('d M Y') : '—';
+
+                fputcsv($file, [
+                    $sl++,
+                    $profile?->membership_id ?? '—',
+                    $user?->name ?? '—',
+                    $user?->email ?? '—',
+                    $user?->phone ?? '—',
+                    $profile?->unit?->name ?? '—',
+                    $feeMonth,
+                    number_format((float) $due->amount, 2, '.', ''),
+                    $due->status,
+                    $paidDate,
+                    $tx?->method ?? 'Online',
+                    $tx?->gateway_transaction_id ?? ($tx ? 'txn_' . $tx->id : '—'),
+                ]);
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
     // ─────────────────────────────────
     // EXPENSES (admin)
     // ─────────────────────────────────

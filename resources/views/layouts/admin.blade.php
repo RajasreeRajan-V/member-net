@@ -1114,9 +1114,14 @@
   <i class="fas fa-images"></i>Gallery
 </a>
 
-<a class="ni {{ request()->routeIs('admin.monthly-fee*') ? 'active' : '' }}"
+<a class="ni {{ request()->routeIs('admin.monthly-fee') ? 'active' : '' }}"
         href="{{ route('admin.monthly-fee') }}" onclick="closeSidebar()">
-        <i class="fas fa-calendar-check"></i>Monthly Fee
+        <i class="fas fa-calendar-check"></i>Monthly Fee Settings
+      </a>
+
+      <a class="ni {{ request()->routeIs('admin.monthly-fee.paid*') ? 'active' : '' }}"
+        href="{{ route('admin.monthly-fee.paid') }}" onclick="closeSidebar()">
+        <i class="fas fa-user-check"></i>Paid Monthly Fees
       </a>
 
 
