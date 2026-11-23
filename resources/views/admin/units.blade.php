@@ -204,7 +204,10 @@
           </label>
           <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
             <div style="width:90px;height:70px;border-radius:8px;background:#ffffff;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;padding:4px;overflow:hidden;flex-shrink:0;">
-              <img id="certModalLogoPreview" src="{{ asset('fumma-logo.png') }}" style="max-width:100%;max-height:100%;object-fit:contain;">
+              <img id="certModalLogoPreview" src="" style="max-width:100%;max-height:100%;object-fit:contain;display:none;">
+              <div id="certModalLogoPlaceholder" style="font-size:10px;font-weight:700;color:#14213d;text-align:center;line-height:1.2;">
+                🎓<br><span style="font-size:9px;color:var(--text-dim);">Member Net</span>
+              </div>
             </div>
             <div style="flex:1;min-width:160px;">
               <input type="file" name="certificate_logo" id="certModalFileInput" accept="image/png,image/jpeg,image/webp"
@@ -217,7 +220,7 @@
           <div id="certModalRemoveLogoBtnWrap" style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);text-align:right;display:none;">
             <button type="button" class="btn bo bsm" style="color:var(--red);border-color:rgba(239,68,68,0.3);"
                     onclick="removeAdminCertLogo()">
-              <i class="fas fa-trash-alt"></i>Remove Logo (Revert to Default)
+              <i class="fas fa-trash-alt"></i>Remove Logo (Revert to Member Net Default)
             </button>
           </div>
         </div>
@@ -242,17 +245,18 @@
         <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:8px;">
           <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:6px;">Signatory 1 (President)</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px;">
-            <input type="text" name="signatory_1_name" id="certModalSig1Name" placeholder="Name (e.g. Tony Pulickal)"
+            <input type="text" name="signatory_1_name" id="certModalSig1Name" placeholder="Name (e.g. President Name)"
                    style="width:100%;padding:6px 10px;font-size:11.5px;border-radius:5px;border:1px solid var(--border);background:var(--card);color:var(--text);">
             <input type="text" name="signatory_1_title" id="certModalSig1Title" placeholder="Title (e.g. Unit President)"
                    style="width:100%;padding:6px 10px;font-size:11.5px;border-radius:5px;border:1px solid var(--border);background:var(--card);color:var(--text);">
           </div>
           <div style="display:flex;align-items:center;gap:10px;">
             <div style="width:90px;height:32px;background:#fff;border:1px solid var(--border);border-radius:4px;display:flex;align-items:center;justify-content:center;padding:2px;flex-shrink:0;">
-              <img id="certModalSig1Preview" src="{{ asset('sign-president.png') }}" style="max-height:100%;max-width:100%;object-fit:contain;">
+              <img id="certModalSig1Preview" src="" style="max-height:100%;max-width:100%;object-fit:contain;display:none;">
+              <span id="certModalSig1Empty" style="font-size:9.5px;color:#888;">No signature</span>
             </div>
             <input type="file" name="signatory_1_signature" accept="image/png,image/jpeg,image/webp"
-                   onchange="previewAdminCertSig(this, 'certModalSig1Preview')" style="font-size:10.5px;color:var(--text);">
+                   onchange="previewAdminCertSig(this, 'certModalSig1Preview', 'certModalSig1Empty')" style="font-size:10.5px;color:var(--text);">
           </div>
         </div>
 
@@ -260,17 +264,18 @@
         <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:8px;">
           <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:6px;">Signatory 2 (General Secretary)</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px;">
-            <input type="text" name="signatory_2_name" id="certModalSig2Name" placeholder="Name (e.g. Shaji Manhar)"
+            <input type="text" name="signatory_2_name" id="certModalSig2Name" placeholder="Name (e.g. Secretary Name)"
                    style="width:100%;padding:6px 10px;font-size:11.5px;border-radius:5px;border:1px solid var(--border);background:var(--card);color:var(--text);">
             <input type="text" name="signatory_2_title" id="certModalSig2Title" placeholder="Title (e.g. Unit Gen. Secretary)"
                    style="width:100%;padding:6px 10px;font-size:11.5px;border-radius:5px;border:1px solid var(--border);background:var(--card);color:var(--text);">
           </div>
           <div style="display:flex;align-items:center;gap:10px;">
             <div style="width:90px;height:32px;background:#fff;border:1px solid var(--border);border-radius:4px;display:flex;align-items:center;justify-content:center;padding:2px;flex-shrink:0;">
-              <img id="certModalSig2Preview" src="{{ asset('sign-secretary.png') }}" style="max-height:100%;max-width:100%;object-fit:contain;">
+              <img id="certModalSig2Preview" src="" style="max-height:100%;max-width:100%;object-fit:contain;display:none;">
+              <span id="certModalSig2Empty" style="font-size:9.5px;color:#888;">No signature</span>
             </div>
             <input type="file" name="signatory_2_signature" accept="image/png,image/jpeg,image/webp"
-                   onchange="previewAdminCertSig(this, 'certModalSig2Preview')" style="font-size:10.5px;color:var(--text);">
+                   onchange="previewAdminCertSig(this, 'certModalSig2Preview', 'certModalSig2Empty')" style="font-size:10.5px;color:var(--text);">
           </div>
         </div>
 
@@ -278,17 +283,18 @@
         <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:8px;">
           <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:6px;">Signatory 3 (Treasurer)</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px;">
-            <input type="text" name="signatory_3_name" id="certModalSig3Name" placeholder="Name (e.g. Rafi Puthoor)"
+            <input type="text" name="signatory_3_name" id="certModalSig3Name" placeholder="Name (e.g. Treasurer Name)"
                    style="width:100%;padding:6px 10px;font-size:11.5px;border-radius:5px;border:1px solid var(--border);background:var(--card);color:var(--text);">
             <input type="text" name="signatory_3_title" id="certModalSig3Title" placeholder="Title (e.g. Unit Treasurer)"
                    style="width:100%;padding:6px 10px;font-size:11.5px;border-radius:5px;border:1px solid var(--border);background:var(--card);color:var(--text);">
           </div>
           <div style="display:flex;align-items:center;gap:10px;">
             <div style="width:90px;height:32px;background:#fff;border:1px solid var(--border);border-radius:4px;display:flex;align-items:center;justify-content:center;padding:2px;flex-shrink:0;">
-              <img id="certModalSig3Preview" src="{{ asset('sign-treasurer.png') }}" style="max-height:100%;max-width:100%;object-fit:contain;">
+              <img id="certModalSig3Preview" src="" style="max-height:100%;max-width:100%;object-fit:contain;display:none;">
+              <span id="certModalSig3Empty" style="font-size:9.5px;color:#888;">No signature</span>
             </div>
             <input type="file" name="signatory_3_signature" accept="image/png,image/jpeg,image/webp"
-                   onchange="previewAdminCertSig(this, 'certModalSig3Preview')" style="font-size:10.5px;color:var(--text);">
+                   onchange="previewAdminCertSig(this, 'certModalSig3Preview', 'certModalSig3Empty')" style="font-size:10.5px;color:var(--text);">
           </div>
         </div>
       </div>
@@ -334,39 +340,77 @@ function openCertConfigModal(unit) {
   // Signatory 1
   document.getElementById('certModalSig1Name').value = unit.signatory_1_name || unit.certificate_president_name || '';
   document.getElementById('certModalSig1Title').value = unit.signatory_1_title || '';
-  document.getElementById('certModalSig1Preview').src = unit.signatory_1_signature ? `{{ asset('storage') }}/${unit.signatory_1_signature}` : `{{ asset('sign-president.png') }}`;
+  const sig1Img = document.getElementById('certModalSig1Preview');
+  const sig1Empty = document.getElementById('certModalSig1Empty');
+  if (unit.signatory_1_signature) {
+    sig1Img.src = `{{ asset('storage') }}/${unit.signatory_1_signature}`;
+    sig1Img.style.display = 'block';
+    sig1Empty.style.display = 'none';
+  } else {
+    sig1Img.src = '';
+    sig1Img.style.display = 'none';
+    sig1Empty.style.display = 'block';
+  }
 
   // Signatory 2
   document.getElementById('certModalSig2Name').value = unit.signatory_2_name || unit.certificate_secretary_name || '';
   document.getElementById('certModalSig2Title').value = unit.signatory_2_title || '';
-  document.getElementById('certModalSig2Preview').src = unit.signatory_2_signature ? `{{ asset('storage') }}/${unit.signatory_2_signature}` : `{{ asset('sign-secretary.png') }}`;
+  const sig2Img = document.getElementById('certModalSig2Preview');
+  const sig2Empty = document.getElementById('certModalSig2Empty');
+  if (unit.signatory_2_signature) {
+    sig2Img.src = `{{ asset('storage') }}/${unit.signatory_2_signature}`;
+    sig2Img.style.display = 'block';
+    sig2Empty.style.display = 'none';
+  } else {
+    sig2Img.src = '';
+    sig2Img.style.display = 'none';
+    sig2Empty.style.display = 'block';
+  }
 
   // Signatory 3
   document.getElementById('certModalSig3Name').value = unit.signatory_3_name || '';
   document.getElementById('certModalSig3Title').value = unit.signatory_3_title || '';
-  document.getElementById('certModalSig3Preview').src = unit.signatory_3_signature ? `{{ asset('storage') }}/${unit.signatory_3_signature}` : `{{ asset('sign-treasurer.png') }}`;
+  const sig3Img = document.getElementById('certModalSig3Preview');
+  const sig3Empty = document.getElementById('certModalSig3Empty');
+  if (unit.signatory_3_signature) {
+    sig3Img.src = `{{ asset('storage') }}/${unit.signatory_3_signature}`;
+    sig3Img.style.display = 'block';
+    sig3Empty.style.display = 'none';
+  } else {
+    sig3Img.src = '';
+    sig3Img.style.display = 'none';
+    sig3Empty.style.display = 'block';
+  }
 
   document.getElementById('certModalFileInput').value = '';
 
   const preview = document.getElementById('certModalLogoPreview');
+  const logoPlaceholder = document.getElementById('certModalLogoPlaceholder');
   const removeBtnWrap = document.getElementById('certModalRemoveLogoBtnWrap');
 
   if (unit.certificate_logo) {
     preview.src = `{{ asset('storage') }}/${unit.certificate_logo}`;
+    preview.style.display = 'block';
+    logoPlaceholder.style.display = 'none';
     removeBtnWrap.style.display = 'block';
   } else {
-    preview.src = '{{ asset("fumma-logo.png") }}';
+    preview.src = '';
+    preview.style.display = 'none';
+    logoPlaceholder.style.display = 'block';
     removeBtnWrap.style.display = 'none';
   }
 
   om('configureCertM');
 }
 
-function previewAdminCertSig(input, previewId) {
+function previewAdminCertSig(input, previewId, emptyId) {
   if (input.files && input.files[0]) {
     const reader = new FileReader();
     reader.onload = function(e) {
-      document.getElementById(previewId).src = e.target.result;
+      const img = document.getElementById(previewId);
+      img.src = e.target.result;
+      img.style.display = 'block';
+      if (emptyId) document.getElementById(emptyId).style.display = 'none';
     };
     reader.readAsDataURL(input.files[0]);
   }
@@ -376,7 +420,10 @@ function previewAdminCertLogo(input) {
   if (input.files && input.files[0]) {
     const reader = new FileReader();
     reader.onload = function(e) {
-      document.getElementById('certModalLogoPreview').src = e.target.result;
+      const img = document.getElementById('certModalLogoPreview');
+      img.src = e.target.result;
+      img.style.display = 'block';
+      document.getElementById('certModalLogoPlaceholder').style.display = 'none';
     };
     reader.readAsDataURL(input.files[0]);
   }

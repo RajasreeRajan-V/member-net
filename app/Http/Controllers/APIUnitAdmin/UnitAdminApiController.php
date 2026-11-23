@@ -136,13 +136,13 @@ public function registerMember(Request $request)
 
     $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
         'name'         => 'required|string',
-        'email'        => 'nullable|email|unique:users,email',
+        'email'        => ['nullable', 'email', \Illuminate\Validation\Rule::unique('users', 'email')->where(fn($q) => $q->where('role', 'member'))],
         'phone'        => 'required|digits:10|unique:users,phone',
         'dob'          => [
             'required', 'date', 'before:today',
             function ($attribute, $value, $fail) {
-                if (\Carbon\Carbon::parse($value)->age < 18) {
-                    $fail('Member must be at least 18 years old.');
+                if (\Carbon\Carbon::parse($value)->age < 5) {
+                    $fail('Member must be at least 5 years old.');
                 }
             }
         ],

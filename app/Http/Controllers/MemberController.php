@@ -36,15 +36,19 @@ class MemberController extends Controller
         
         $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
             'name'         => 'required|string',
-            'email'        => 'required|email|unique:users,email',
+            'email'        => [
+                'required',
+                'email',
+                Rule::unique('users', 'email')->where(fn($q) => $q->where('role', 'member')),
+            ],
             'phone'        => 'required|digits:10|unique:users,phone',
             'dob'          => [
                 'required',
                 'date',
                 'before:today',
                 function ($attribute, $value, $fail) {
-                    if (Carbon::parse($value)->age < 18) {
-                        $fail('You must be at least 18 years old.');
+                    if (Carbon::parse($value)->age < 5) {
+                        $fail('You must be at least 5 years old.');
                     }
                 }
             ],
@@ -278,7 +282,7 @@ class MemberController extends Controller
             'email'        => [
                 'sometimes',
                 'email',
-                Rule::unique('users', 'email')->ignore($user->id),
+                Rule::unique('users', 'email')->where(fn($q) => $q->where('role', 'member'))->ignore($user->id),
             ],
             'phone'        => [
                 'sometimes',
@@ -290,8 +294,8 @@ class MemberController extends Controller
                 'date',
                 'before:today',
                 function ($attribute, $value, $fail) {
-                    if (Carbon::parse($value)->age < 18) {
-                        $fail('You must be at least 18 years old.');
+                    if (Carbon::parse($value)->age < 5) {
+                        $fail('You must be at least 5 years old.');
                     }
                 }
             ],
@@ -643,7 +647,7 @@ class MemberController extends Controller
         $user      = auth()->user();
         $unitAdmin = $user->unitAdmin;
 
-        $profile = MemberProfile::with(['user', 'unit', 'district', 'state'])
+        $profile = MemberProfile::with(['user', 'unit', 'state'])
                     ->find($request->id);
 
         if ($unitAdmin && $profile->unit_id != $unitAdmin->unit_id) {
@@ -666,8 +670,7 @@ class MemberController extends Controller
                 'membership_type' => $profile->membership_type,
                 'status'          => $profile->status,
                 'unit_name'       => $profile->unit->name ?? '—',
-                'district_name'   => $profile->district?->name ?? '—',
-                'state_name'      => $profile->state->name,
+                'state_name'      => $profile->state->name ?? '—',
                 'registered_on'   => (string) $profile->created_at,
             ],
             'Member detail fetched successfully'
@@ -851,10 +854,10 @@ public function certificateInfo()
     }
 
     // Helper to resolve files safely whether stored in Storage disk 'public' or public_path
-    $resolveFile = function (?string $path, string $fallbackAsset) {
+    $resolveFile = function (?string $path) {
         if (!$path) {
             return [
-                'public_url'   => asset($fallbackAsset),
+                'public_url'   => null,
                 'storage_path' => null,
                 'is_custom'    => false,
             ];
@@ -887,25 +890,24 @@ public function certificateInfo()
         }
 
         return [
-            'public_url'   => asset($fallbackAsset),
+            'public_url'   => null,
             'storage_path' => null,
             'is_custom'    => false,
         ];
     };
 
     // ── DYNAMIC UNIT-SPECIFIC CERTIFICATE LOGO ──
-    $logoRes       = $resolveFile($unit?->certificate_logo, 'fumma-logo.png');
+    $logoRes       = $resolveFile($unit?->certificate_logo);
     $logoPublicUrl = $logoRes['public_url'];
     $isCustomLogo  = $logoRes['is_custom'];
     $logoDataUrl   = null;
+    $hasGd         = extension_loaded('gd');
 
     if ($logoRes['storage_path'] && file_exists($logoRes['storage_path'])) {
-        $mime        = @mime_content_type($logoRes['storage_path']) ?: 'image/png';
-        $logoDataUrl = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($logoRes['storage_path']));
-    } else {
-        $defaultLogoPath = public_path('fumma-logo.png');
-        if (file_exists($defaultLogoPath)) {
-            $logoDataUrl = 'data:image/png;base64,' . base64_encode(file_get_contents($defaultLogoPath));
+        $mime   = @mime_content_type($logoRes['storage_path']) ?: 'image/png';
+        $isJpeg = (str_contains($mime, 'jpeg') || str_contains($mime, 'jpg')) && !str_contains($mime, 'webp');
+        if ($hasGd || $isJpeg) {
+            $logoDataUrl = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($logoRes['storage_path']));
         }
     }
 
@@ -918,20 +920,20 @@ public function certificateInfo()
         ? $baseSealName
         : ($baseSealName . ' ' . $joinedYear);
 
-    // ── SIGNATORIES CONFIGURED IN UNIT ADMIN PANEL ──
-    $s1Name  = ($unit && $unit->signatory_1_name) ? $unit->signatory_1_name : (($unit && $unit->certificate_president_name) ? $unit->certificate_president_name : 'Tony Pulickal');
-    $s1Title = ($unit && $unit->signatory_1_title) ? $unit->signatory_1_title : (($unit && ($unit->signatory_1_name || $unit->certificate_president_name)) ? ($unit->name . ' Unit President') : 'State President');
-    $sig1Res = $resolveFile($unit?->signatory_1_signature, 'sign-president.png');
+    // ── SIGNATORIES CONFIGURED IN ADMIN PANEL ──
+    $s1Name  = $unit?->signatory_1_name ?: ($unit?->certificate_president_name ?: null);
+    $s1Title = $unit?->signatory_1_title ?: ($unit ? ($unit->name . ' Unit President') : 'President');
+    $sig1Res = $resolveFile($unit?->signatory_1_signature);
     $s1Sig   = $sig1Res['public_url'];
 
-    $s2Name  = ($unit && $unit->signatory_2_name) ? $unit->signatory_2_name : (($unit && $unit->certificate_secretary_name) ? $unit->certificate_secretary_name : 'Shaji Manhar');
-    $s2Title = ($unit && $unit->signatory_2_title) ? $unit->signatory_2_title : (($unit && ($unit->signatory_2_name || $unit->certificate_secretary_name)) ? ($unit->name . ' Unit Gen. Secretary') : 'State General Secretary');
-    $sig2Res = $resolveFile($unit?->signatory_2_signature, 'sign-secretary.png');
+    $s2Name  = $unit?->signatory_2_name ?: ($unit?->certificate_secretary_name ?: null);
+    $s2Title = $unit?->signatory_2_title ?: ($unit ? ($unit->name . ' Unit Gen. Secretary') : 'General Secretary');
+    $sig2Res = $resolveFile($unit?->signatory_2_signature);
     $s2Sig   = $sig2Res['public_url'];
 
-    $s3Name  = ($unit && $unit->signatory_3_name) ? $unit->signatory_3_name : 'Rafi Puthoor';
-    $s3Title = ($unit && $unit->signatory_3_title) ? $unit->signatory_3_title : (($unit && $unit->signatory_3_name) ? ($unit->name . ' Unit Treasurer') : 'State Treasurer');
-    $sig3Res = $resolveFile($unit?->signatory_3_signature, 'sign-treasurer.png');
+    $s3Name  = $unit?->signatory_3_name ?: null;
+    $s3Title = $unit?->signatory_3_title ?: ($unit ? ($unit->name . ' Unit Treasurer') : 'Treasurer');
+    $sig3Res = $resolveFile($unit?->signatory_3_signature);
     $s3Sig   = $sig3Res['public_url'];
 
     $signatory1 = [
@@ -988,6 +990,7 @@ public function certificateInfo()
         'unit_id'                    => $unit->id ?? null,
         'unit_name'                  => $unit->name ?? null,
         'name'                       => $unit->name ?? null,
+        'association_name'           => 'Member Net Association',
         'certificate_logo'           => $logoPublicUrl,
         'logo'                       => $logoPublicUrl,
         'is_custom_certificate_logo' => $isCustomLogo,
@@ -1013,6 +1016,7 @@ public function certificateInfo()
             'membership_id'              => $profile->membership_id,
             'message'                    => 'Successfully! Now you are a Member Net member.',
             'certificate_url'            => asset('storage/' . $relative),
+            'association_name'           => 'Member Net Association',
             'certificate_logo'           => $logoPublicUrl,
             'logo'                       => $logoPublicUrl,
             'is_custom_certificate_logo' => $isCustomLogo,

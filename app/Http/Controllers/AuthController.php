@@ -54,7 +54,22 @@ class AuthController extends Controller
 
         $user = null;
         if (filter_var($loginInput, FILTER_VALIDATE_EMAIL)) {
-            $user = User::where('email', strtolower($loginInput))->first();
+            $matchingUsers = User::where('email', strtolower($loginInput))->get();
+            if ($matchingUsers->count() > 1) {
+                $foundUser = null;
+                foreach ($matchingUsers as $candUser) {
+                    $valid = ($candUser->role === 'member')
+                        ? (Hash::check($request->password, $candUser->password) || hash_equals((string) $candUser->phone, (string) $request->password))
+                        : Hash::check($request->password, $candUser->password);
+                    if ($valid) {
+                        $foundUser = $candUser;
+                        break;
+                    }
+                }
+                $user = $foundUser ?? $matchingUsers->first();
+            } else {
+                $user = $matchingUsers->first();
+            }
         } else {
             // Try Member ID (case-insensitive)
             $matchedProfile = \App\Models\MemberProfile::where('membership_id', $loginInput)
@@ -295,7 +310,22 @@ public function loginV2(Request $request)
 
     if (filter_var($username, FILTER_VALIDATE_EMAIL)) {
         // Email → admins (and pending members who have no membership ID yet)
-        $user = User::where('email', strtolower($username))->first();
+        $matchingUsers = User::where('email', strtolower($username))->get();
+        if ($matchingUsers->count() > 1) {
+            $foundUser = null;
+            foreach ($matchingUsers as $candUser) {
+                $valid = ($candUser->role === 'member')
+                    ? (Hash::check($request->password, $candUser->password) || hash_equals((string) $candUser->phone, (string) $request->password))
+                    : Hash::check($request->password, $candUser->password);
+                if ($valid) {
+                    $foundUser = $candUser;
+                    break;
+                }
+            }
+            $user = $foundUser ?? $matchingUsers->first();
+        } else {
+            $user = $matchingUsers->first();
+        }
         if ($user && $user->role === 'member') {
             $memberProfile = \App\Models\MemberProfile::where('user_id', $user->id)->first();
         }

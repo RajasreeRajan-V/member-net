@@ -8,7 +8,7 @@ use Illuminate\Contracts\Validation\ValidationRule;
 
 class MinimumAge implements ValidationRule
 {
-    public function __construct(private int $years = 18) {}
+    public function __construct(private int $years = 5) {}
 
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {

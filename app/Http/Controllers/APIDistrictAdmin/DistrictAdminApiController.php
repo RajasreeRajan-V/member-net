@@ -494,13 +494,13 @@ public function registerMember(Request $request)
 
     $validator = Validator::make($request->all(), [
         'name'         => ['required', 'string', 'max:100', 'regex:/^[A-Za-z]+(?:[\s\'\-][A-Za-z]+)*$/'],
-        'email'        => ['nullable', 'email:rfc,dns', 'max:150', 'unique:users,email'],
+        'email'        => ['nullable', 'email:rfc,dns', 'max:150', Rule::unique('users', 'email')->where(fn($q) => $q->where('role', 'member'))],
         'phone'        => ['required', 'digits:10', 'regex:/^[6-9][0-9]{9}$/', 'unique:users,phone'],
         'dob'          => [
             'required', 'date', 'before:today',
             function ($attribute, $value, $fail) {
-                if (Carbon::parse($value)->age < 18) {
-                    $fail('Member must be at least 18 years old.');
+                if (Carbon::parse($value)->age < 5) {
+                    $fail('Member must be at least 5 years old.');
                 }
             },
         ],
@@ -1007,7 +1007,7 @@ public function registerUnitAdmin(Request $request)
 
     $validator = Validator::make($request->all(), [
         'name'    => ['required', 'string', 'max:100', 'regex:/^[A-Za-z]+(?:[\s\'\-][A-Za-z]+)*$/'],
-        'email'   => ['required', 'email:rfc,dns', 'max:150', 'unique:users,email'],
+        'email'   => ['required', 'email:rfc,dns', 'max:150', Rule::unique('users', 'email')->where(fn($q) => $q->where('role', 'unit_admin'))],
         'phone'   => ['required', 'digits:10', 'regex:/^[6-9][0-9]{9}$/', 'unique:users,phone'],
         'unit_id' => [
             'required',

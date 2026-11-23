@@ -26,12 +26,12 @@ class Unit extends Model
         'signatory_3_signature',
     ];
 
-    public function getCertificateLogoUrlAttribute()
+    public function getCertificateLogoUrlAttribute(): ?string
     {
         if ($this->certificate_logo && \Illuminate\Support\Facades\Storage::disk('public')->exists($this->certificate_logo)) {
             return asset('storage/' . $this->certificate_logo);
         }
-        return asset('fumma-logo.png');
+        return null;
     }
 
     public function getFormattedIdAttribute(): string

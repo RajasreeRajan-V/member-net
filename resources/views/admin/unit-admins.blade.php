@@ -23,7 +23,6 @@
           <th>Email</th>
           <th>Phone</th>
           <th>Unit</th>
-          <th>District</th>
           <th>Status</th>
           <th>Actions</th>
         </tr>
@@ -50,9 +49,6 @@
           <td style="color:var(--text-dim)">{{ $ua->user->email }}</td>
           <td style="color:var(--text-dim)">{{ $ua->user->phone }}</td>
           <td><span class="utag">{{ $ua->unit->name }}</span></td>
-          <td style="color:var(--text-dim)">
-            {{ $ua->unit?->district?->name ?? '—' }}
-          </td>
           <td>
             <span class="badge {{ $ua->user->is_active ? 'bac' : 'brj' }}">
               {{ $ua->user->is_active ? 'Active' : 'Inactive' }}
@@ -183,7 +179,6 @@
               <option value="{{ $unit->id }}"
                 @selected(old('form') === 'create' && old('unit_id') == $unit->id)>
                 {{ $unit->name }}
-                @if($unit->district)({{ $unit->district->name }})@endif
               </option>
             @endforeach
           </select>
@@ -267,10 +262,10 @@
           <label>Assign Unit</label>
           <select name="unit_id" id="editUAUnit" required>
             <option value="">Select Unit</option>
-            @foreach(\App\Models\Unit::with('district')->orderBy('name')->get() as $unit)
+            @foreach(\App\Models\Unit::orderBy('name')->get() as $unit)
               <option value="{{ $unit->id }}"
                 @selected(old('form') === 'edit' && old('unit_id') == $unit->id)>
-                {{ $unit->name }}@if($unit->district) ({{ $unit->district->name }})@endif
+                {{ $unit->name }}
               </option>
             @endforeach
           </select>

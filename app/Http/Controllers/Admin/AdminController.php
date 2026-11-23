@@ -328,11 +328,9 @@ public function updateDistrict(Request $request)
         return view('admin.unit-admins', [
             'unitAdmins' => UnitAdmin::with([
                 'user',
-                'unit.district.state'
+                'unit'
             ])->latest('id')->get(),
-            'units' => Unit::with('district.state')
-                ->doesntHave('unitAdmin')
-                ->get(),
+            'units' => Unit::doesntHave('unitAdmin')->get(),
         ]);
     }
 
@@ -343,9 +341,8 @@ public function updateDistrict(Request $request)
         $inputPhone = trim($request->phone ?? '');
 
         if ($inputEmail) {
-            $conflicting = User::withTrashed()->where('email', $inputEmail)->first();
-            if ($conflicting && ($conflicting->trashed() || $conflicting->role === 'district_admin')) {
-                \Illuminate\Support\Facades\DB::table('district_admins')->where('user_id', $conflicting->id)->delete();
+            $conflicting = User::withTrashed()->where('email', $inputEmail)->where('role', 'unit_admin')->first();
+            if ($conflicting && $conflicting->trashed()) {
                 $conflicting->forceDelete();
             }
         }
@@ -372,7 +369,7 @@ public function updateDistrict(Request $request)
                 'email:rfc,dns',
                 'max:150',
                 'regex:/^[^@\s]+@[^@\s]+\.[a-zA-Z]{2,}$/',
-                'unique:users,email',
+                Rule::unique('users', 'email')->where(fn($q) => $q->where('role', 'unit_admin')),
             ],
             'phone'   => ['required', 'regex:/^[6-9]\d{9}$/', 'unique:users,phone'],
             'unit_id' => 'required|exists:units,id',
@@ -383,7 +380,7 @@ public function updateDistrict(Request $request)
             'email.dns'     => 'This email domain does not appear to accept mail. Please check for typos.',
             'email.max'     => 'Email cannot exceed 150 characters.',
             'email.regex'   => 'Email must include a valid domain (e.g. name@example.com).',
-            'email.unique'  => 'This email is already registered.',
+            'email.unique'  => 'This email is already registered to a unit admin.',
             'phone.regex'   => 'Enter a valid 10-digit Indian phone number.',
             'phone.unique'  => 'This phone number is already used.',
         ]);
@@ -448,10 +445,10 @@ public function updateDistrict(Request $request)
 
         if ($inputEmail) {
             $conflicting = User::withTrashed()->where('email', $inputEmail)
+                ->where('role', 'unit_admin')
                 ->when($currentUserId, fn($q) => $q->where('id', '!=', $currentUserId))
                 ->first();
-            if ($conflicting && ($conflicting->trashed() || $conflicting->role === 'district_admin')) {
-                \Illuminate\Support\Facades\DB::table('district_admins')->where('user_id', $conflicting->id)->delete();
+            if ($conflicting && $conflicting->trashed()) {
                 $conflicting->forceDelete();
             }
         }
@@ -479,9 +476,11 @@ public function updateDistrict(Request $request)
                 'email:rfc,dns',
                 'max:150',
                 'regex:/^[^@\s]+@[^@\s]+\.[a-zA-Z]{2,}$/',
-                Rule::unique('users', 'email')->ignore(
-                    UnitAdmin::find($request->id)?->user_id
-                ),
+                Rule::unique('users', 'email')
+                    ->where(fn($q) => $q->where('role', 'unit_admin'))
+                    ->ignore(
+                        UnitAdmin::find($request->id)?->user_id
+                    ),
             ],
             'phone'   => [
                 'required',
@@ -968,7 +967,7 @@ public function updateDistrict(Request $request)
         $inputPhone = trim($request->phone ?? '');
 
         if ($inputEmail) {
-            $conflicting = User::withTrashed()->where('email', $inputEmail)->first();
+            $conflicting = User::withTrashed()->where('email', $inputEmail)->where('role', 'member')->first();
             if ($conflicting && $conflicting->trashed()) {
                 $conflicting->forceDelete();
             }
@@ -993,7 +992,7 @@ public function updateDistrict(Request $request)
                 'email:rfc,dns',
                 'max:150',
                 'regex:/^[^@\s]+@[^@\s]+\.[a-zA-Z]{2,}$/',
-                'unique:users,email',
+                Rule::unique('users', 'email')->where(fn($q) => $q->where('role', 'member')),
             ],
             'phone'        => [
                 'required',
@@ -1001,7 +1000,7 @@ public function updateDistrict(Request $request)
                 'regex:/^[6-9][0-9]{9}$/',
                 'unique:users,phone'
             ],
-            'dob'          => ['required', 'date', 'before:today', new MinimumAge(18)],
+            'dob'          => ['required', 'date', 'before:today', new MinimumAge(5)],
             'organization' => 'required|string|max:150',
             'address'      => 'required|string|max:500',
             'unit_id'      => 'required|exists:units,id',
@@ -1013,7 +1012,7 @@ public function updateDistrict(Request $request)
             'email.dns'             => 'This email domain does not appear to accept mail. Please check for typos.',
             'email.max'             => 'Email cannot exceed 150 characters.',
             'email.regex'           => 'Email must include a valid domain (e.g. name@example.com).',
-            'email.unique'          => 'This email is already registered.',
+            'email.unique'          => 'This email is already registered to a member.',
             'phone.regex'           => 'Enter a valid 10-digit Indian phone number.',
             'phone.unique'          => 'This phone number is already used.',
             'organization.required' => 'Shop name is required.',
@@ -1108,12 +1107,22 @@ public function updateDistrict(Request $request)
         }
 
         $fummaNote = $isFummaMember ? ' Member Net: Yes.' : ' Member Net: No.';
+        $successMsg = 'Member ' . $profile->user->name . ' created and approved! Membership ID: ' .
+            $profile->membership_id . '.' . $fummaNote . $emailNote;
 
-        return back()->with(
-            'success',
-            'Member ' . $profile->user->name . ' created and approved! Membership ID: ' .
-            $profile->membership_id . '.' . $fummaNote . $emailNote
-        );
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $successMsg,
+                'member'  => [
+                    'id'            => $profile->id,
+                    'membership_id' => $profile->membership_id,
+                    'name'          => $profile->user->name,
+                ]
+            ]);
+        }
+
+        return back()->with('success', $successMsg);
     }
 
 public function updateMember(Request $request)
@@ -1127,7 +1136,7 @@ public function updateMember(Request $request)
             'regex:/^[A-Za-z]+(?:[\s\'\-][A-Za-z]+)*$/',
         ],
         'phone'        => ['required', 'regex:/^[6-9]\d{9}$/'],
-        'dob'          => ['required', 'date', 'before:today', new MinimumAge(18)],
+        'dob'          => ['required', 'date', 'before:today', new MinimumAge(5)],
         'organization' => 'required|string|max:150',
         'address'      => 'required|string|max:500',
         'photo'        => [
@@ -2138,8 +2147,8 @@ public function updateMember(Request $request)
                     $errors[] = 'Email domain does not appear to accept mail (check for typos)';
                 }
 
-                if (User::where('email', $email)->exists()) {
-                    $errors[] = 'Email already exists';
+                if (User::where('email', $email)->where('role', 'member')->exists()) {
+                    $errors[] = 'Email already exists for another member';
                 }
             }
 
@@ -2159,8 +2168,8 @@ public function updateMember(Request $request)
                     $parsedDob = Carbon::parse($data['dob']);
                     if ($parsedDob->isFuture()) {
                         $errors[] = 'DOB cannot be in the future';
-                    } elseif ($parsedDob->age < 18) {
-                        $errors[] = 'Member must be at least 18 years old';
+                    } elseif ($parsedDob->age < 5) {
+                        $errors[] = 'Member must be at least 5 years old';
                     } else {
                         $dob = $parsedDob->format('Y-m-d');
                     }
@@ -2234,7 +2243,7 @@ public function updateMember(Request $request)
                 $profile = \Illuminate\Support\Facades\DB::transaction(function () use ($data, $email, $dob, $unitModel, $isFummaMember) {
                     // Purge soft-deleted conflicting accounts if any
                     if ($email) {
-                        $conflicting = User::withTrashed()->where('email', $email)->first();
+                        $conflicting = User::withTrashed()->where('email', $email)->where('role', 'member')->first();
                         if ($conflicting && $conflicting->trashed()) {
                             $conflicting->forceDelete();
                         }
@@ -3566,11 +3575,6 @@ public function updateMember(Request $request)
             $realLogoPath = Storage::disk('public')->path($unit->certificate_logo);
             $mime         = @mime_content_type($realLogoPath) ?: 'image/png';
             $logoDataUrl  = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($realLogoPath));
-        } else {
-            $defaultLogoPath = public_path('fumma-logo.png');
-            if (file_exists($defaultLogoPath)) {
-                $logoDataUrl = 'data:image/png;base64,' . base64_encode(file_get_contents($defaultLogoPath));
-            }
         }
 
         $joinedYear   = date('Y');

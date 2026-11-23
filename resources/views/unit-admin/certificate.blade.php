@@ -46,7 +46,9 @@
             @if($unit->certificate_logo && \Illuminate\Support\Facades\Storage::disk('public')->exists($unit->certificate_logo))
               <img id="logoPreviewImg" src="{{ asset('storage/' . $unit->certificate_logo) }}" style="max-width:100%;max-height:100%;object-fit:contain;">
             @else
-              <img id="logoPreviewImg" src="{{ asset('fumma-logo.png') }}" style="max-width:100%;max-height:100%;object-fit:contain;">
+              <div id="logoPreviewImg" style="font-size:10px;font-weight:700;color:#14213d;text-align:center;line-height:1.2;">
+                🎓<br><span style="font-size:9px;color:var(--text-dim);">Member Net</span>
+              </div>
             @endif
           </div>
 
@@ -55,7 +57,7 @@
               @if($unit->certificate_logo && \Illuminate\Support\Facades\Storage::disk('public')->exists($unit->certificate_logo))
                 <span class="badge bac" style="font-size:10px;padding:2px 7px;">Custom Unit Logo</span>
               @else
-                <span class="badge" style="background:rgba(255,255,255,0.08);color:var(--text-dim);font-size:10px;padding:2px 7px;">Default Central Logo</span>
+                <span class="badge" style="background:rgba(255,255,255,0.08);color:var(--text-dim);font-size:10px;padding:2px 7px;">Default Member Net Branding</span>
               @endif
             </div>
 
@@ -121,14 +123,14 @@
           <div class="fg">
             <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:4px;">Full Name</label>
             <input type="text" name="signatory_1_name" value="{{ old('signatory_1_name', $unit->signatory_1_name ?? $unit->certificate_president_name) }}"
-                   placeholder="e.g. Tony Pulickal (or Unit President Name)"
+                   placeholder="e.g. Unit President Name"
                    maxlength="100"
                    style="width:100%;padding:8px 12px;font-size:12px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);">
           </div>
           <div class="fg">
             <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:4px;">Designation</label>
             <input type="text" name="signatory_1_title" value="{{ old('signatory_1_title', $unit->signatory_1_title) }}"
-                   placeholder="e.g. {{ $unit->name }} Unit President (or State President)"
+                   placeholder="e.g. {{ $unit->name }} Unit President (or President)"
                    maxlength="100"
                    style="width:100%;padding:8px 12px;font-size:12px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);">
           </div>
@@ -141,7 +143,7 @@
               @if($unit->signatory_1_signature && \Illuminate\Support\Facades\Storage::disk('public')->exists($unit->signatory_1_signature))
                 <img id="sig1Preview" src="{{ asset('storage/' . $unit->signatory_1_signature) }}" style="max-height:100%;max-width:100%;object-fit:contain;">
               @else
-                <img id="sig1Preview" src="{{ asset('sign-president.png') }}" style="max-height:100%;max-width:100%;object-fit:contain;" title="Default signature">
+                <span id="sig1Preview" style="font-size:10px;color:#888;">No signature</span>
               @endif
             </div>
             <div style="flex:1;min-width:180px;">
@@ -152,7 +154,7 @@
                 @if($unit->signatory_1_signature)
                   <span style="color:var(--green);"><i class="fas fa-check-circle"></i> Custom signature active</span>
                 @else
-                  <span>Default signature active (Upload PNG to replace)</span>
+                  <span style="color:var(--text-dim);">No signature uploaded</span>
                 @endif
               </div>
             </div>
@@ -179,14 +181,14 @@
           <div class="fg">
             <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:4px;">Full Name</label>
             <input type="text" name="signatory_2_name" value="{{ old('signatory_2_name', $unit->signatory_2_name ?? $unit->certificate_secretary_name) }}"
-                   placeholder="e.g. Shaji Manhar (or Unit Secretary Name)"
+                   placeholder="e.g. Unit Secretary Name"
                    maxlength="100"
                    style="width:100%;padding:8px 12px;font-size:12px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);">
           </div>
           <div class="fg">
             <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:4px;">Designation</label>
             <input type="text" name="signatory_2_title" value="{{ old('signatory_2_title', $unit->signatory_2_title) }}"
-                   placeholder="e.g. {{ $unit->name }} Unit Gen. Secretary (or State General Secretary)"
+                   placeholder="e.g. {{ $unit->name }} Unit Gen. Secretary (or General Secretary)"
                    maxlength="100"
                    style="width:100%;padding:8px 12px;font-size:12px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);">
           </div>
@@ -199,7 +201,7 @@
               @if($unit->signatory_2_signature && \Illuminate\Support\Facades\Storage::disk('public')->exists($unit->signatory_2_signature))
                 <img id="sig2Preview" src="{{ asset('storage/' . $unit->signatory_2_signature) }}" style="max-height:100%;max-width:100%;object-fit:contain;">
               @else
-                <img id="sig2Preview" src="{{ asset('sign-secretary.png') }}" style="max-height:100%;max-width:100%;object-fit:contain;" title="Default signature">
+                <span id="sig2Preview" style="font-size:10px;color:#888;">No signature</span>
               @endif
             </div>
             <div style="flex:1;min-width:180px;">
@@ -210,7 +212,7 @@
                 @if($unit->signatory_2_signature)
                   <span style="color:var(--green);"><i class="fas fa-check-circle"></i> Custom signature active</span>
                 @else
-                  <span>Default signature active (Upload PNG to replace)</span>
+                  <span style="color:var(--text-dim);">No signature uploaded</span>
                 @endif
               </div>
             </div>
@@ -237,14 +239,14 @@
           <div class="fg">
             <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:4px;">Full Name</label>
             <input type="text" name="signatory_3_name" value="{{ old('signatory_3_name', $unit->signatory_3_name) }}"
-                   placeholder="e.g. Rafi Puthoor (or Unit Treasurer Name)"
+                   placeholder="e.g. Unit Treasurer Name"
                    maxlength="100"
                    style="width:100%;padding:8px 12px;font-size:12px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);">
           </div>
           <div class="fg">
             <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:4px;">Designation</label>
             <input type="text" name="signatory_3_title" value="{{ old('signatory_3_title', $unit->signatory_3_title) }}"
-                   placeholder="e.g. {{ $unit->name }} Unit Treasurer (or State Treasurer)"
+                   placeholder="e.g. {{ $unit->name }} Unit Treasurer (or Treasurer)"
                    maxlength="100"
                    style="width:100%;padding:8px 12px;font-size:12px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);">
           </div>
@@ -257,7 +259,7 @@
               @if($unit->signatory_3_signature && \Illuminate\Support\Facades\Storage::disk('public')->exists($unit->signatory_3_signature))
                 <img id="sig3Preview" src="{{ asset('storage/' . $unit->signatory_3_signature) }}" style="max-height:100%;max-width:100%;object-fit:contain;">
               @else
-                <img id="sig3Preview" src="{{ asset('sign-treasurer.png') }}" style="max-height:100%;max-width:100%;object-fit:contain;" title="Default signature">
+                <span id="sig3Preview" style="font-size:10px;color:#888;">No signature</span>
               @endif
             </div>
             <div style="flex:1;min-width:180px;">
@@ -268,7 +270,7 @@
                 @if($unit->signatory_3_signature)
                   <span style="color:var(--green);"><i class="fas fa-check-circle"></i> Custom signature active</span>
                 @else
-                  <span>Default signature active (Upload PNG to replace)</span>
+                  <span style="color:var(--text-dim);">No signature uploaded</span>
                 @endif
               </div>
             </div>

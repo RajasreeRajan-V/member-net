@@ -183,9 +183,8 @@ class DistrictAdminController extends Controller
         $inputPhone = trim($request->phone ?? '');
 
         if ($inputEmail) {
-            $conflicting = User::withTrashed()->where('email', $inputEmail)->first();
-            if ($conflicting && ($conflicting->trashed() || $conflicting->role === 'district_admin')) {
-                \Illuminate\Support\Facades\DB::table('district_admins')->where('user_id', $conflicting->id)->delete();
+            $conflicting = User::withTrashed()->where('email', $inputEmail)->where('role', 'unit_admin')->first();
+            if ($conflicting && $conflicting->trashed()) {
                 $conflicting->forceDelete();
             }
         }
@@ -202,7 +201,7 @@ class DistrictAdminController extends Controller
 
         $request->validate([
             'name'    => ['required', 'string', 'max:100', 'regex:/^[A-Za-z]+(?:[\s\'\-][A-Za-z]+)*$/'],
-            'email'   => ['required', 'email:rfc,dns', 'max:150', 'unique:users,email'],
+            'email'   => ['required', 'email:rfc,dns', 'max:150', Rule::unique('users', 'email')->where(fn($q) => $q->where('role', 'unit_admin'))],
             'phone'   => ['required', 'regex:/^[6-9]\d{9}$/', 'unique:users,phone'],
             'unit_id' => [
                 'required',
@@ -271,7 +270,7 @@ class DistrictAdminController extends Controller
 
         $request->validate([
             'name'    => ['required', 'string', 'max:100', 'regex:/^[A-Za-z]+(?:[\s\'\-][A-Za-z]+)*$/'],
-            'email'   => ['required', 'email:rfc,dns', 'max:150', Rule::unique('users', 'email')->ignore($unitAdmin->user_id)],
+            'email'   => ['required', 'email:rfc,dns', 'max:150', Rule::unique('users', 'email')->where(fn($q) => $q->where('role', 'unit_admin'))->ignore($unitAdmin->user_id)],
             'phone'   => ['required', 'regex:/^[6-9]\d{9}$/', Rule::unique('users', 'phone')->ignore($unitAdmin->user_id)],
             'unit_id' => [
                 'required',
@@ -451,9 +450,9 @@ class DistrictAdminController extends Controller
 
         $request->validate([
             'name'     => ['required', 'string', 'max:100', 'regex:/^[A-Za-z]+(?:[\s\'\-][A-Za-z]+)*$/'],
-            'email'    => ['nullable', 'email:rfc,dns', 'max:150', 'unique:users,email'],
+            'email'    => ['nullable', 'email:rfc,dns', 'max:150', Rule::unique('users', 'email')->where(fn($q) => $q->where('role', 'member'))],
             'phone'    => ['required', 'digits:10', 'regex:/^[6-9][0-9]{9}$/', 'unique:users,phone'],
-            'dob'      => ['required', 'date', 'before:today', new MinimumAge(18)],
+            'dob'      => ['required', 'date', 'before:today', new MinimumAge(5)],
             'organization' => 'required|string|max:150',
             'address'      => 'required|string|max:500',
             'unit_id'      => ['required', Rule::exists('units', 'id')->where(fn($q) => $q->where('district_id', $districtId))],
@@ -543,12 +542,22 @@ class DistrictAdminController extends Controller
         }
 
         $fummaNote = $isFummaMember ? ' Member Net: Yes.' : ' Member Net: No.';
+        $successMsg = 'Member ' . $profile->user->name . ' created and approved! Membership ID: ' .
+            $profile->membership_id . '.' . $fummaNote . $emailNote;
 
-        return back()->with(
-            'success',
-            'Member ' . $profile->user->name . ' created and approved! Membership ID: ' .
-            $profile->membership_id . '.' . $fummaNote . $emailNote
-        );
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $successMsg,
+                'member'  => [
+                    'id'            => $profile->id,
+                    'membership_id' => $profile->membership_id,
+                    'name'          => $profile->user->name,
+                ]
+            ]);
+        }
+
+        return back()->with('success', $successMsg);
     }
 
     public function memberDetail($id)
@@ -770,8 +779,8 @@ class DistrictAdminController extends Controller
                 if ($emailValid && !$this->emailDomainHasMailRecords($email)) {
                     $errors[] = 'Email domain does not appear to accept mail (check for typos)';
                 }
-                if (User::where('email', $email)->exists()) {
-                    $errors[] = 'Email already exists';
+                if (User::where('email', $email)->where('role', 'member')->exists()) {
+                    $errors[] = 'Email already exists for another member';
                 }
             }
 
@@ -791,8 +800,8 @@ class DistrictAdminController extends Controller
                     $parsedDob = Carbon::parse($data['dob']);
                     if ($parsedDob->isFuture()) {
                         $errors[] = 'DOB cannot be in the future';
-                    } elseif ($parsedDob->age < 18) {
-                        $errors[] = 'Member must be at least 18 years old';
+                    } elseif ($parsedDob->age < 5) {
+                        $errors[] = 'Member must be at least 5 years old';
                     } else {
                         $dob = $parsedDob->format('Y-m-d');
                     }

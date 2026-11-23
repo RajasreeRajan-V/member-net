@@ -296,6 +296,7 @@
     .alert { padding: 12px 16px; border-radius: 8px; font-size: 12px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
     .alert-success { background: rgba(52,211,153,0.1); border: 1px solid rgba(52,211,153,0.3); color: var(--green); }
     .alert-error { background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.3); color: var(--red); }
+    input.is-invalid, select.is-invalid, textarea.is-invalid { border-color: #f87171 !important; box-shadow: 0 0 0 1px rgba(248,113,113,0.3) !important; }
 
     /* ── STAT CARDS ── */
     .sg { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 20px; }
@@ -528,7 +529,7 @@
 
     <div class="content">
       @if(session('success'))
-        <div class="alert alert-success">
+        <div id="flashSuccessAlert" class="alert alert-success" style="transition: opacity 0.3s ease, margin-bottom 0.3s ease;">
           <i class="fas fa-check-circle"></i> {{ session('success') }}
         </div>
       @endif
@@ -548,6 +549,20 @@
     function cm(id) { document.getElementById(id).classList.remove('open'); }
     document.querySelectorAll('.mo').forEach(m => {
       m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
+    });
+
+    /* ── AUTO-DISMISS SUCCESS ALERT AFTER 2 SECONDS ── */
+    document.addEventListener('DOMContentLoaded', function () {
+      const successAlert = document.getElementById('flashSuccessAlert') || document.querySelector('.alert-success');
+      if (successAlert) {
+        setTimeout(function () {
+          successAlert.style.opacity = '0';
+          setTimeout(function () {
+            successAlert.style.display = 'none';
+            if (successAlert.parentNode) successAlert.remove();
+          }, 300);
+        }, 2000);
+      }
     });
 
     /* ── SIDEBAR OPEN / CLOSE (mobile) ── */

@@ -47,7 +47,7 @@
       <a href="{{ route('unit-admin.members.download-all', request()->query()) }}" class="btn bo bsm" title="Download all filtered members as Excel">
         <i class="fas fa-file-excel"></i> Download Excel
       </a>
-      <button class="btn bp bsm" onclick="om('addMemberM')">
+      <button class="btn bp bsm" onclick="openAddMemberModal()">
         <i class="fas fa-plus"></i> Add Member
       </button>
     </div>
@@ -63,7 +63,7 @@
         </a>
       @else
         <p>No members found</p>
-        <button class="btn bp bsm" style="margin-top:10px;" onclick="om('addMemberM')">
+        <button class="btn bp bsm" style="margin-top:10px;" onclick="openAddMemberModal()">
           <i class="fas fa-plus"></i> Add First Member
         </button>
       @endif
@@ -188,14 +188,14 @@
         <i class="fas fa-user-plus" style="color:var(--accent);margin-right:6px;"></i>
         Add New Member
       </span>
-      <div class="mc3" onclick="closeAndReset('addMemberM','addMemberForm')"><i class="fas fa-times"></i></div>
+      <div class="mc3" onclick="closeAddMemberModal()"><i class="fas fa-times"></i></div>
     </div>
     <form method="POST" action="{{ route('unit-admin.members.store') }}"
-      enctype="multipart/form-data" autocomplete="off" id="addMemberForm">
+      enctype="multipart/form-data" autocomplete="off" id="addMemberForm" novalidate>
       @csrf
 
       @if ($errors->any())
-        <div style="margin:14px 18px 0;padding:10px 12px;
+        <div id="addMemberError" style="margin:14px 18px 0;padding:10px 12px;
                     background:rgba(239,68,68,0.1);
                     border:1px solid rgba(239,68,68,0.3);
                     border-radius:8px;font-size:12px;color:#f87171;">
@@ -270,7 +270,7 @@
       </div>
 
       <div class="ff">
-        <button type="button" class="btn bo" onclick="closeAndReset('addMemberM','addMemberForm')">Cancel</button>
+        <button type="button" class="btn bo" onclick="closeAddMemberModal()">Cancel</button>
         <button type="submit" class="btn bp">
           <i class="fas fa-user-plus"></i>Create Member
         </button>
@@ -601,7 +601,299 @@
     `;
   }
 
+  function clearAddMemberErrors() {
+    const errBox = document.getElementById('addMemberError');
+    if (errBox) {
+      errBox.style.display = 'none';
+      errBox.remove();
+    }
+    const form = document.getElementById('addMemberForm');
+    if (form) {
+      form.querySelectorAll('.is-invalid, .error, .error-message, .invalid-feedback').forEach(el => {
+        el.classList.remove('is-invalid', 'error');
+        if (el.classList.contains('error-message') || el.classList.contains('invalid-feedback')) {
+          el.remove();
+        }
+      });
+    }
+  }
+
+  function clearFieldError(fieldName) {
+    const form = document.getElementById('addMemberForm');
+    if (form) {
+      const fieldEl = form.querySelector(`[name="${fieldName}"]`);
+      if (fieldEl) fieldEl.classList.remove('is-invalid');
+    }
+    const errBox = document.getElementById('addMemberError');
+    if (errBox) {
+      const li = errBox.querySelector(`li[data-field="${fieldName}"]`);
+      if (li) li.remove();
+      if (errBox.querySelectorAll('li').length === 0) {
+        errBox.remove();
+      }
+    }
+  }
+
+  function showAddMemberErrors(errors) {
+    clearAddMemberErrors();
+    const form = document.getElementById('addMemberForm');
+    if (!form || !errors || errors.length === 0) return;
+
+    const errorDiv = document.createElement('div');
+    errorDiv.id = 'addMemberError';
+    errorDiv.style.cssText = 'margin:14px 18px 0;padding:10px 12px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:8px;font-size:12px;color:#f87171;';
+
+    const ul = document.createElement('ul');
+    ul.style.cssText = 'margin:0;padding-left:16px;';
+
+    errors.forEach(err => {
+      const li = document.createElement('li');
+      li.textContent = err.message || err;
+      if (err.field) {
+        li.setAttribute('data-field', err.field);
+        const fieldEl = form.querySelector(`[name="${err.field}"]`);
+        if (fieldEl) fieldEl.classList.add('is-invalid');
+      }
+      ul.appendChild(li);
+    });
+
+    errorDiv.appendChild(ul);
+    const personalInfoTitle = form.querySelector('div[style*="Personal Info"]');
+    if (personalInfoTitle) {
+      form.insertBefore(errorDiv, personalInfoTitle);
+    } else {
+      form.insertBefore(errorDiv, form.firstChild);
+    }
+  }
+
+  function showFlashSuccessMessage(message, duration = 2000, onComplete = null) {
+    dismissSuccessAlert();
+    const contentDiv = document.querySelector('.content');
+    if (!contentDiv) return;
+
+    const alertDiv = document.createElement('div');
+    alertDiv.id = 'flashSuccessAlert';
+    alertDiv.className = 'alert alert-success';
+    alertDiv.style.cssText = 'transition: opacity 0.3s ease, margin-bottom 0.3s ease; opacity: 1;';
+    alertDiv.innerHTML = `<i class="fas fa-check-circle"></i> ${message}`;
+
+    contentDiv.insertBefore(alertDiv, contentDiv.firstChild);
+
+    setTimeout(function () {
+      alertDiv.style.opacity = '0';
+      setTimeout(function () {
+        alertDiv.style.display = 'none';
+        if (alertDiv.parentNode) alertDiv.remove();
+        if (typeof onComplete === 'function') {
+          onComplete();
+        }
+      }, 300);
+    }, duration);
+  }
+
+  function validateMemberForm(form) {
+    const errors = [];
+    const name = form.querySelector('[name="name"]');
+    if (!name || !name.value.trim()) {
+      errors.push({ field: 'name', message: 'Full name is required.' });
+    }
+
+    const email = form.querySelector('[name="email"]');
+    if (email && email.value.trim()) {
+      const emailPattern = /^[^@\s]+@[^@\s]+\.[a-zA-Z]{2,}$/;
+      if (!emailPattern.test(email.value.trim())) {
+        errors.push({ field: 'email', message: 'Enter a valid email address with a domain (e.g. name@example.com).' });
+      }
+    }
+
+    const phone = form.querySelector('[name="phone"]');
+    if (!phone || !phone.value.trim()) {
+      errors.push({ field: 'phone', message: 'Phone number is required.' });
+    } else if (!/^[6-9]\d{9}$/.test(phone.value.trim())) {
+      errors.push({ field: 'phone', message: 'Enter a valid 10-digit Indian phone number starting with 6-9.' });
+    }
+
+    const dob = form.querySelector('[name="dob"]');
+    if (!dob || !dob.value.trim()) {
+      errors.push({ field: 'dob', message: 'Date of birth is required.' });
+    } else {
+      const dobDate = new Date(dob.value);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (dobDate >= today) {
+        errors.push({ field: 'dob', message: 'Date of birth cannot be in the future.' });
+      } else {
+        let age = today.getFullYear() - dobDate.getFullYear();
+        const m = today.getMonth() - dobDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < dobDate.getDate())) {
+          age--;
+        }
+        if (age < 5) {
+          errors.push({ field: 'dob', message: 'Member must be at least 5 years old.' });
+        }
+      }
+    }
+
+    const org = form.querySelector('[name="organization"]');
+    if (!org || !org.value.trim()) {
+      errors.push({ field: 'organization', message: 'Organization / Shop name is required.' });
+    }
+
+    const address = form.querySelector('[name="address"]');
+    if (!address || !address.value.trim()) {
+      errors.push({ field: 'address', message: 'Address is required.' });
+    }
+
+    const photo = form.querySelector('[name="photo"]');
+    if (!photo || !photo.files || photo.files.length === 0) {
+      errors.push({ field: 'photo', message: 'Member photo is required.' });
+    } else {
+      const file = photo.files[0];
+      const validTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+      if (!validTypes.includes(file.type)) {
+        errors.push({ field: 'photo', message: 'Photo must be a JPG, JPEG, or PNG image.' });
+      } else if (file.size > 2 * 1024 * 1024) {
+        errors.push({ field: 'photo', message: 'Photo size cannot exceed 2MB.' });
+      }
+    }
+
+    return errors;
+  }
+
+  function dismissSuccessAlert() {
+    const successAlerts = document.querySelectorAll('#flashSuccessAlert, .alert-success');
+    successAlerts.forEach(alert => {
+      alert.style.display = 'none';
+      if (alert.parentNode) alert.remove();
+    });
+  }
+
+  function resetAddMemberModal() {
+    dismissSuccessAlert();
+    clearAddMemberErrors();
+    const form = document.getElementById('addMemberForm');
+    if (form) {
+      form.reset();
+      form.querySelectorAll('input[type="text"], input[type="email"], input[type="date"], textarea')
+        .forEach(el => { el.value = ''; el.classList.remove('is-invalid'); });
+      const fileInput = form.querySelector('input[type="file"]');
+      if (fileInput) fileInput.value = '';
+    }
+  }
+
+  function openAddMemberModal() {
+    dismissSuccessAlert();
+    resetAddMemberModal();
+    om('addMemberM');
+  }
+
+  function closeAddMemberModal() {
+    resetAddMemberModal();
+    cm('addMemberM');
+  }
+
+  // Close and reset if user clicks outside modal (backdrop)
+  document.addEventListener('DOMContentLoaded', function () {
+    const addModal = document.getElementById('addMemberM');
+    if (addModal) {
+      addModal.addEventListener('click', function (e) {
+        if (e.target === addModal) {
+          resetAddMemberModal();
+        }
+      });
+    }
+
+    const form = document.getElementById('addMemberForm');
+    if (form) {
+      // Dynamic real-time error clearing when user edits fields
+      form.querySelectorAll('input, textarea, select').forEach(input => {
+        const handler = function () {
+          clearFieldError(input.name);
+        };
+        input.addEventListener('input', handler);
+        input.addEventListener('change', handler);
+        input.addEventListener('keyup', handler);
+      });
+
+      // Submit with dynamic revalidation
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        clearAddMemberErrors();
+
+        const clientErrors = validateMemberForm(form);
+        if (clientErrors.length > 0) {
+          showAddMemberErrors(clientErrors);
+          return false;
+        }
+
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const origBtnHtml = submitBtn ? submitBtn.innerHTML : '';
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Registering...';
+        }
+
+        const formData = new FormData(form);
+
+        fetch(form.action, {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+          }
+        })
+        .then(async response => {
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = origBtnHtml;
+          }
+
+          if (response.status === 422) {
+            const data = await response.json().catch(() => ({}));
+            const serverErrors = [];
+            if (data.errors) {
+              Object.keys(data.errors).forEach(field => {
+                data.errors[field].forEach(msg => {
+                  serverErrors.push({ field: field, message: msg });
+                });
+              });
+            } else if (data.message) {
+              serverErrors.push({ field: '', message: data.message });
+            }
+            showAddMemberErrors(serverErrors);
+            return;
+          }
+
+          if (response.ok) {
+            const data = await response.json().catch(() => ({}));
+            const successMsg = data.message || 'Member created and approved successfully!';
+            closeAddMemberModal();
+            showFlashSuccessMessage(successMsg, 2000, function () {
+              window.location.reload();
+            });
+            return;
+          }
+
+          const errData = await response.json().catch(() => ({}));
+          showAddMemberErrors([{ field: '', message: errData.message || 'Failed to create member. Please try again.' }]);
+        })
+        .catch(() => {
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = origBtnHtml;
+          }
+          form.submit();
+        });
+      });
+    }
+  });
+
   function closeAndReset(modalId, formId) {
+    if (modalId === 'addMemberM' || formId === 'addMemberForm') {
+      closeAddMemberModal();
+      return;
+    }
     cm(modalId);
     const form = document.getElementById(formId);
     if (form) form.reset();

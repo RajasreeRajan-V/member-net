@@ -56,7 +56,11 @@ class UnitAdminController extends Controller
     {
         $request->validate([
             'name'    => 'required|string',
-            'email'   => 'required|email|unique:users,email',
+            'email'   => [
+                'required',
+                'email',
+                Rule::unique('users', 'email')->where(fn($q) => $q->where('role', 'unit_admin')),
+            ],
             'phone'   => 'required|digits:10|unique:users,phone',
             'unit_id' => 'required|exists:units,id',
         ]);
@@ -130,6 +134,7 @@ class UnitAdminController extends Controller
                 'sometimes',
                 'email',
                 Rule::unique('users', 'email')
+                    ->where(fn($q) => $q->where('role', 'unit_admin'))
                     ->ignore(
                         UnitAdmin::find($request->id)?->user_id
                     )

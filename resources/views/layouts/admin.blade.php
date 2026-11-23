@@ -788,6 +788,7 @@
       border: 1px solid rgba(248, 113, 113, 0.3);
       color: var(--red);
     }
+    input.is-invalid, select.is-invalid, textarea.is-invalid { border-color: #f87171 !important; box-shadow: 0 0 0 1px rgba(248,113,113,0.3) !important; }
 
     /* ── STAT CARDS ── */
     .sg {
@@ -1219,7 +1220,7 @@
 
     <div class="content">
       @if(session('success'))
-        <div class="alert alert-success">
+        <div id="flashSuccessAlert" class="alert alert-success" style="transition: opacity 0.3s ease, margin-bottom 0.3s ease;">
           <i class="fas fa-check-circle"></i>
           {{ session('success') }}
         </div>
@@ -1242,6 +1243,20 @@
       m.addEventListener('click', e => {
         if (e.target === m) m.classList.remove('open');
       });
+    });
+
+    /* ── AUTO-DISMISS SUCCESS ALERT AFTER 2 SECONDS ── */
+    document.addEventListener('DOMContentLoaded', function () {
+      const successAlert = document.getElementById('flashSuccessAlert') || document.querySelector('.alert-success');
+      if (successAlert) {
+        setTimeout(function () {
+          successAlert.style.opacity = '0';
+          setTimeout(function () {
+            successAlert.style.display = 'none';
+            if (successAlert.parentNode) successAlert.remove();
+          }, 300);
+        }, 2000);
+      }
     });
 
     /* ── SIDEBAR OPEN / CLOSE (mobile) ── */

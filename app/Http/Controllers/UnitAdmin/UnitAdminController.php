@@ -118,10 +118,10 @@ class UnitAdminController extends Controller
                 'email:rfc,dns',
                 'max:150',
                 'regex:/^[^@\s]+@[^@\s]+\.[a-zA-Z]{2,}$/',
-                'unique:users,email',
+                \Illuminate\Validation\Rule::unique('users', 'email')->where(fn($q) => $q->where('role', 'member')),
             ],
             'phone'        => 'required|digits:10|unique:users,phone',
-            'dob'          => ['required', 'date', 'before:today', new MinimumAge(18)],
+            'dob'          => ['required', 'date', 'before:today', new MinimumAge(5)],
             'organization' => 'required|string',
             'address'      => 'required|string|max:500',
             'photo'        => 'required|image|mimes:jpg,jpeg,png|max:2048',
@@ -130,7 +130,7 @@ class UnitAdminController extends Controller
             'email.dns'        => 'This email domain does not appear to accept mail. Please check for typos.',
             'email.max'        => 'Email cannot exceed 150 characters.',
             'email.regex'      => 'Email must include a valid domain (e.g. name@example.com).',
-            'email.unique'     => 'This email is already registered.',
+            'email.unique'     => 'This email is already registered to a member.',
             'address.required' => 'Address is required.',
             'address.max'      => 'Address cannot exceed 500 characters.',
             'photo.required'   => 'Member photo is required.',
@@ -217,12 +217,22 @@ class UnitAdminController extends Controller
         }
 
         $fummaNote = $isFummaMember ? ' Member Net: Yes.' : ' Member Net: No.';
+        $successMsg = $profile->user->name . ' added and approved! Membership ID: ' .
+            $profile->membership_id . '.' . $fummaNote . $emailNote;
 
-        return back()->with(
-            'success',
-            $profile->user->name . ' added and approved! Membership ID: ' .
-            $profile->membership_id . '.' . $fummaNote . $emailNote
-        );
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $successMsg,
+                'member'  => [
+                    'id'            => $profile->id,
+                    'membership_id' => $profile->membership_id,
+                    'name'          => $profile->user->name,
+                ]
+            ]);
+        }
+
+        return back()->with('success', $successMsg);
     }
 
     // ── null-safe relations so the JSON response can't 500 ──
@@ -1125,8 +1135,8 @@ class UnitAdminController extends Controller
                 if ($emailValid && !$this->emailDomainHasMailRecords($email)) {
                     $errors[] = 'Email domain does not appear to accept mail (check for typos)';
                 }
-                if (\App\Models\User::where('email', $email)->exists()) {
-                    $errors[] = 'Email already exists';
+                if (\App\Models\User::where('email', $email)->where('role', 'member')->exists()) {
+                    $errors[] = 'Email already exists for another member';
                 }
             }
 
@@ -1143,8 +1153,8 @@ class UnitAdminController extends Controller
                     $parsedDob = Carbon::parse($data['dob']);
                     if ($parsedDob->isFuture()) {
                         $errors[] = 'DOB cannot be in the future';
-                    } elseif ($parsedDob->age < 18) {
-                        $errors[] = 'Member must be at least 18 years old';
+                    } elseif ($parsedDob->age < 5) {
+                        $errors[] = 'Member must be at least 5 years old';
                     } else {
                         $dob = $parsedDob->format('Y-m-d');
                     }
@@ -1171,7 +1181,7 @@ class UnitAdminController extends Controller
                 $profile = \Illuminate\Support\Facades\DB::transaction(function () use ($data, $email, $dob, $unitId, $isFummaMember) {
                     // Purge soft-deleted conflicting accounts if any
                     if ($email) {
-                        $conflicting = \App\Models\User::withTrashed()->where('email', $email)->first();
+                        $conflicting = \App\Models\User::withTrashed()->where('email', $email)->where('role', 'member')->first();
                         if ($conflicting && $conflicting->trashed()) {
                             $conflicting->forceDelete();
                         }
@@ -2492,11 +2502,6 @@ class UnitAdminController extends Controller
             $realLogoPath = Storage::disk('public')->path($unit->certificate_logo);
             $mime         = @mime_content_type($realLogoPath) ?: 'image/png';
             $logoDataUrl  = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($realLogoPath));
-        } else {
-            $defaultLogoPath = public_path('fumma-logo.png');
-            if (file_exists($defaultLogoPath)) {
-                $logoDataUrl = 'data:image/png;base64,' . base64_encode(file_get_contents($defaultLogoPath));
-            }
         }
 
         $joinedYear   = date('Y');

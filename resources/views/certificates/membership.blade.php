@@ -3,7 +3,7 @@
     $unitObj = $unit ?? $profile->unit ?? null;
     $hasGd = extension_loaded('gd');
 
-    $resolveSignDataUrl = function ($customStoragePath, $defaultPublicFile) use ($hasGd) {
+    $resolveSignDataUrl = function ($customStoragePath) use ($hasGd) {
         if ($customStoragePath) {
             $cleanPath = ltrim(preg_replace('#^/?storage/#', '', $customStoragePath), '/');
             $fullPath = null;
@@ -16,19 +16,9 @@
             }
             if ($fullPath && file_exists($fullPath)) {
                 $mime = @mime_content_type($fullPath) ?: 'image/png';
-                $isJpeg = in_array(strtolower(pathinfo($fullPath, PATHINFO_EXTENSION)), ['jpg', 'jpeg']) || str_contains($mime, 'jpeg');
+                $isJpeg = (str_contains($mime, 'jpeg') || str_contains($mime, 'jpg')) && !str_contains($mime, 'webp');
                 if ($hasGd || $isJpeg) {
                     return 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($fullPath));
-                }
-            }
-        }
-        if ($defaultPublicFile) {
-            $path = public_path($defaultPublicFile);
-            if (file_exists($path)) {
-                $mime = @mime_content_type($path) ?: 'image/png';
-                $isJpeg = in_array(strtolower(pathinfo($path, PATHINFO_EXTENSION)), ['jpg', 'jpeg']) || str_contains($mime, 'jpeg');
-                if ($hasGd || $isJpeg) {
-                    return 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($path));
                 }
             }
         }
@@ -36,19 +26,19 @@
     };
 
     // Signatory 1 (President)
-    $s1Name  = ($unitObj && $unitObj->signatory_1_name) ? $unitObj->signatory_1_name : (($unitObj && $unitObj->certificate_president_name) ? $unitObj->certificate_president_name : 'Tony Pulickal');
-    $s1Title = ($unitObj && $unitObj->signatory_1_title) ? $unitObj->signatory_1_title : (($unitObj && ($unitObj->signatory_1_name || $unitObj->certificate_president_name)) ? ($unitObj->name . ' Unit President') : 'State President');
-    $s1Img   = $resolveSignDataUrl($unitObj->signatory_1_signature ?? null, 'sign-president.png');
+    $s1Name  = $unitObj?->signatory_1_name ?: ($unitObj?->certificate_president_name ?: '');
+    $s1Title = $unitObj?->signatory_1_title ?: ($unitObj ? ($unitObj->name . ' Unit President') : 'President');
+    $s1Img   = $resolveSignDataUrl($unitObj?->signatory_1_signature ?? null);
 
     // Signatory 2 (General Secretary)
-    $s2Name  = ($unitObj && $unitObj->signatory_2_name) ? $unitObj->signatory_2_name : (($unitObj && $unitObj->certificate_secretary_name) ? $unitObj->certificate_secretary_name : 'Shaji Manhar');
-    $s2Title = ($unitObj && $unitObj->signatory_2_title) ? $unitObj->signatory_2_title : (($unitObj && ($unitObj->signatory_2_name || $unitObj->certificate_secretary_name)) ? ($unitObj->name . ' Unit Gen. Secretary') : 'State General Secretary');
-    $s2Img   = $resolveSignDataUrl($unitObj->signatory_2_signature ?? null, 'sign-secretary.png');
+    $s2Name  = $unitObj?->signatory_2_name ?: ($unitObj?->certificate_secretary_name ?: '');
+    $s2Title = $unitObj?->signatory_2_title ?: ($unitObj ? ($unitObj->name . ' Unit Gen. Secretary') : 'General Secretary');
+    $s2Img   = $resolveSignDataUrl($unitObj?->signatory_2_signature ?? null);
 
     // Signatory 3 (Treasurer)
-    $s3Name  = ($unitObj && $unitObj->signatory_3_name) ? $unitObj->signatory_3_name : 'Rafi Puthoor';
-    $s3Title = ($unitObj && $unitObj->signatory_3_title) ? $unitObj->signatory_3_title : (($unitObj && $unitObj->signatory_3_name) ? ($unitObj->name . ' Unit Treasurer') : 'State Treasurer');
-    $s3Img   = $resolveSignDataUrl($unitObj->signatory_3_signature ?? null, 'sign-treasurer.png');
+    $s3Name  = $unitObj?->signatory_3_name ?: '';
+    $s3Title = $unitObj?->signatory_3_title ?: ($unitObj ? ($unitObj->name . ' Unit Treasurer') : 'Treasurer');
+    $s3Img   = $resolveSignDataUrl($unitObj?->signatory_3_signature ?? null);
 
     $sigs = [
         ['name' => $s1Name, 'title' => $s1Title, 'img' => $s1Img],
@@ -167,8 +157,13 @@
         @if($logo)
             <img src="{{ $logo }}">
         @else
-            <div class="logo-text" style="font-size:24px;font-weight:bold;color:#14213d;letter-spacing:1px;padding-top:12px;">
-                {{ $unitObj->name ?? 'Member Net' }}
+            <div class="logo-wrap" style="text-align:center;padding-top:10px;">
+                <div style="font-family:'DejaVu Serif',serif;font-size:24px;font-weight:bold;color:#14213d;letter-spacing:1.5px;text-transform:uppercase;">
+                    {{ $unitObj->name ? ($unitObj->name . ' UNIT') : 'MEMBER NET' }}
+                </div>
+                <div style="font-size:11px;font-weight:bold;color:#d4a62a;letter-spacing:3px;margin-top:2px;">
+                    MEMBER NET ASSOCIATION
+                </div>
             </div>
         @endif
     </div>
